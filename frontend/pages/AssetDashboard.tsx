@@ -7,7 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from "recharts";
 import { 
-  Package, RefreshCw, AlertCircle, Shield, Users, PackageCheck, PackageX
+  Package, RefreshCw, AlertCircle, Shield, Users, PackageCheck, PackageX, ScanLine
 } from "lucide-react";
 
 export default function AssetDashboard() {
@@ -63,8 +63,8 @@ export default function AssetDashboard() {
   }
 
   const stats = statsData?.stats;
-  const categoryData = stats?.assetsByCategory.map(c => ({ name: c.category.replace('_', ' '), value: c.count })) || [];
-  const statusData = stats?.assetsByStatus.map(s => ({ name: s.status.replace('_', ' '), value: s.count })) || [];
+  const categoryData = stats?.assetsByCategory.map(c => ({ name: c.category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), value: c.count })) || [];
+  const statusData = stats?.assetsByStatus.map(s => ({ name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), value: s.count })) || [];
   const userData = stats?.assetsByUser || [];
   const auditProgress = stats?.auditProgress;
 
@@ -86,17 +86,18 @@ export default function AssetDashboard() {
         <Card><CardContent className="p-6"><div className="flex items-center"><Shield className="h-8 w-8 text-yellow-600" /><div className="ml-4"><p className="text-sm font-medium text-gray-500">Warranty Expiring Soon</p><p className="text-2xl font-semibold text-gray-900">{stats?.warrantyExpiringSoon}</p></div></div></CardContent></Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Assets by Category</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
-                  {categoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
+              <BarChart data={categoryData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis fontSize={12} />
                 <Tooltip />
-              </PieChart>
+                <Bar dataKey="value" fill="#8884d8" />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -104,20 +105,19 @@ export default function AssetDashboard() {
           <CardHeader><CardTitle>Assets by Status</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={statusData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" fontSize={12} />
-                <YAxis fontSize={12} />
+              <PieChart>
+                <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
+                  {statusData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
                 <Tooltip />
-                <Bar dataKey="value" fill="#82ca9d" />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Top 10 Users by Asset Count</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -135,22 +135,26 @@ export default function AssetDashboard() {
           <CardHeader><CardTitle>Audit Progress</CardTitle></CardHeader>
           <CardContent>
             {auditProgress && (
-              <div className="space-y-4">
+              <div className="space-y-4 pt-4">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Total Assets</span>
-                  <span>{auditProgress.totalAssets}</span>
+                  <span className="font-bold">{auditProgress.totalAssets}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Audited Assets</span>
-                  <span>{auditProgress.auditedAssets} ({auditProgress.totalAssets > 0 ? Math.round((auditProgress.auditedAssets / auditProgress.totalAssets) * 100) : 0}%)</span>
+                  <span className="font-bold">{auditProgress.auditedAssets} ({auditProgress.totalAssets > 0 ? Math.round((auditProgress.auditedAssets / auditProgress.totalAssets) * 100) : 0}%)</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${auditProgress.totalAssets > 0 ? (auditProgress.auditedAssets / auditProgress.totalAssets) * 100 : 0}%` }}></div>
+                <div className="w-full bg-gray-200 rounded-full h-4">
+                  <div className="bg-blue-600 h-4 rounded-full" style={{ width: `${auditProgress.totalAssets > 0 ? (auditProgress.auditedAssets / auditProgress.totalAssets) * 100 : 0}%` }}></div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Valid: {auditProgress.validAssets}</span>
-                  <span>Invalid: {auditProgress.invalidAssets}</span>
+                <div className="flex justify-between text-sm pt-2">
+                  <span className="text-green-600 font-medium">Valid: {auditProgress.validAssets}</span>
+                  <span className="text-red-600 font-medium">Invalid: {auditProgress.invalidAssets}</span>
                 </div>
+                <Button className="w-full mt-4" onClick={() => navigate("/assets/audit")}>
+                  <ScanLine className="w-4 h-4 mr-2" />
+                  Start New Audit
+                </Button>
               </div>
             )}
           </CardContent>

@@ -161,159 +161,157 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
     <title>Asset Label - ${asset.asset_id}</title>
     <style>
         @media print {
-            body { margin: 0; }
+            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none; }
+            .label { page-break-inside: avoid; }
         }
-        
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: ${isA4 ? '20mm' : '5mm'};
-            background: white;
+            background: #f0f2f5;
         }
-        
+        .label-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
         .label {
             width: ${isA4 ? '180mm' : '95mm'};
             height: ${isA4 ? '120mm' : '60mm'};
-            border: 2px solid #000;
-            padding: ${isA4 ? '10mm' : '5mm'};
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: ${isA4 ? '8mm' : '4mm'};
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            page-break-after: always;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        
         .header {
-            text-align: center;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: ${isA4 ? '8mm' : '4mm'};
-            margin-bottom: ${isA4 ? '5mm' : '3mm'};
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: ${isA4 ? '6mm' : '3mm'};
+            margin-bottom: ${isA4 ? '6mm' : '3mm'};
         }
-        
         .company-name {
-            font-size: ${isA4 ? '18px' : '14px'};
+            font-size: ${isA4 ? '20px' : '16px'};
             font-weight: bold;
-            color: #333;
-            margin-bottom: ${isA4 ? '4mm' : '2mm'};
+            color: #1e3a8a;
         }
-        
         .asset-title {
-            font-size: ${isA4 ? '16px' : '12px'};
+            font-size: ${isA4 ? '14px' : '10px'};
             color: #666;
+            text-transform: uppercase;
         }
-        
         .content {
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex: 1;
         }
-        
         .asset-info {
-            flex: 1;
-            margin-right: ${isA4 ? '10mm' : '5mm'};
+            flex: 2;
+            padding-right: ${isA4 ? '8mm' : '4mm'};
         }
-        
         .qr-code {
+            flex: 1;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        
         .qr-code img {
-            width: ${isA4 ? '80px' : '60px'};
-            height: ${isA4 ? '80px' : '60px'};
+            width: ${isA4 ? '100px' : '70px'};
+            height: ${isA4 ? '100px' : '70px'};
+            border: 2px solid #eee;
+            padding: 4px;
+            border-radius: 4px;
         }
-        
-        .info-row {
-            margin-bottom: ${isA4 ? '3mm' : '2mm'};
+        .qr-code-text {
+            font-size: ${isA4 ? '10px' : '8px'};
+            color: #555;
+            margin-top: 4px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: ${isA4 ? '4mm 8mm' : '2mm 4mm'};
             font-size: ${isA4 ? '12px' : '10px'};
         }
-        
         .info-label {
-            font-weight: bold;
-            color: #444;
-            display: inline-block;
-            width: ${isA4 ? '25mm' : '20mm'};
+            font-weight: 600;
+            color: #374151;
+            text-align: right;
         }
-        
         .info-value {
-            color: #666;
+            color: #4b5563;
+            font-family: 'Consolas', 'Monaco', monospace;
         }
-        
         .footer {
             text-align: center;
             font-size: ${isA4 ? '10px' : '8px'};
-            color: #888;
-            border-top: 1px solid #ccc;
-            padding-top: ${isA4 ? '3mm' : '2mm'};
+            color: #9ca3af;
+            border-top: 1px solid #eee;
+            padding-top: ${isA4 ? '4mm' : '2mm'};
+            margin-top: ${isA4 ? '4mm' : '2mm'};
         }
-        
         .print-button {
-            background: #007bff;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #3b82f6;
             color: white;
             border: none;
             padding: 10px 20px;
             border-radius: 4px;
             cursor: pointer;
-            margin-bottom: 20px;
             font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        
         .print-button:hover {
-            background: #0056b3;
+            background: #2563eb;
         }
     </style>
 </head>
 <body>
     <button class="print-button no-print" onclick="window.print()">Print Label</button>
-    
-    <div class="label">
-        <div class="header">
-            <div class="company-name">IDESOLUSI</div>
-            <div class="asset-title">IT Asset Management</div>
-        </div>
-        
-        <div class="content">
-            <div class="asset-info">
-                <div class="info-row">
-                    <span class="info-label">Asset ID:</span>
-                    <span class="info-value">${asset.asset_id}</span>
+    <div class="label-container">
+        <div class="label">
+            <div class="header">
+                <div class="company-name">IDESOLUSI</div>
+                <div class="asset-title">IT Asset Tag</div>
+            </div>
+            <div class="content">
+                <div class="asset-info">
+                    <div class="info-grid">
+                        <span class="info-label">Asset ID:</span>
+                        <span class="info-value">${asset.asset_id}</span>
+                        
+                        <span class="info-label">Hostname:</span>
+                        <span class="info-value">${asset.hostname || asset.asset_id}</span>
+                        
+                        <span class="info-label">Product:</span>
+                        <span class="info-value">${asset.product_name}</span>
+                        
+                        <span class="info-label">Brand:</span>
+                        <span class="info-value">${asset.brand_name} ${asset.model || ''}</span>
+                        
+                        <span class="info-label">Serial:</span>
+                        <span class="info-value">${asset.serial_number}</span>
+                    </div>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Hostname:</span>
-                    <span class="info-value">${asset.hostname || asset.asset_id}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Product:</span>
-                    <span class="info-value">${asset.product_name}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Brand:</span>
-                    <span class="info-value">${asset.brand_name}</span>
-                </div>
-                ${asset.model ? `
-                <div class="info-row">
-                    <span class="info-label">Model:</span>
-                    <span class="info-value">${asset.model}</span>
-                </div>
-                ` : ''}
-                <div class="info-row">
-                    <span class="info-label">Serial:</span>
-                    <span class="info-value">${asset.serial_number}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Year:</span>
-                    <span class="info-value">${asset.date_acquired ? new Date(asset.date_acquired).getFullYear() : new Date().getFullYear()}</span>
+                <div class="qr-code">
+                    <img src="${qrCodeDataUrl}" alt="QR Code" />
+                    <div class="qr-code-text">Scan for details</div>
                 </div>
             </div>
-            
-            <div class="qr-code">
-                <img src="${qrCodeDataUrl}" alt="QR Code" />
+            <div class="footer">
+                Acquired: ${asset.date_acquired ? new Date(asset.date_acquired).toLocaleDateString() : 'N/A'} | Property of IDESOLUSI
             </div>
-        </div>
-        
-        <div class="footer">
-            Generated on ${new Date().toLocaleDateString()} | Scan QR code for asset details
         </div>
     </div>
 </body>

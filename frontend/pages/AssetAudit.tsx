@@ -24,7 +24,9 @@ import {
   HelpCircle, 
   Loader2,
   Download,
-  RefreshCw
+  RefreshCw,
+  Camera,
+  CameraOff
 } from "lucide-react";
 
 export default function AssetAudit() {
@@ -33,7 +35,7 @@ export default function AssetAudit() {
   const queryClient = useQueryClient();
   const [scanResult, setScanResult] = useState<any>(null);
   const [notes, setNotes] = useState("");
-  const [isScanning, setIsScanning] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
 
   const scanMutation = useMutation({
     mutationFn: (data: { qrCodeData: string; notes?: string }) => backend.asset.scanAsset(data),
@@ -54,6 +56,7 @@ export default function AssetAudit() {
         description: error.message || "Failed to process scan. Please try again.",
         variant: "destructive",
       });
+      setIsScanning(false);
     },
   });
 
@@ -63,7 +66,7 @@ export default function AssetAudit() {
   });
 
   const handleScan = (result: any, error: any) => {
-    if (!!result) {
+    if (!!result && isScanning) {
       scanMutation.mutate({ qrCodeData: result.text, notes });
     }
     if (!!error) {
@@ -91,12 +94,18 @@ export default function AssetAudit() {
           <CardContent>
             {isScanning ? (
               <div className="space-y-4">
-                <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
+                <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center relative">
                   <QrReader
                     onResult={handleScan}
                     constraints={{ facingMode: "environment" }}
                     containerStyle={{ width: '100%', height: '100%' }}
                   />
+                  <div className="absolute bottom-2 right-2">
+                    <Button variant="destructive" size="sm" onClick={() => setIsScanning(false)}>
+                      <CameraOff className="w-4 h-4 mr-2" />
+                      Stop Scanning
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes (Optional)</Label>
@@ -105,24 +114,35 @@ export default function AssetAudit() {
               </div>
             ) : (
               <div className="space-y-4">
-                {scanResult.status === 'valid' && (
-                  <Alert variant="default"><CheckCircle className="h-4 w-4" /><AlertDescription>Asset Validated: {scanResult.message}</AlertDescription></Alert>
-                )}
-                {scanResult.status === 'invalid' && (
-                  <Alert variant="destructive"><XCircle className="h-4 w-4" /><AlertDescription>Asset Invalid: {scanResult.message}</AlertDescription></Alert>
-                )}
-                {scanResult.status === 'not_found' && (
-                  <Alert variant="destructive"><HelpCircle className="h-4 w-4" /><AlertDescription>Asset Not Found: {scanResult.message}</AlertDescription></Alert>
-                )}
-                {scanResult.asset && (
-                  <div className="space-y-2">
-                    <p><strong>Asset ID:</strong> {scanResult.asset.assetId}</p>
-                    <p><strong>Product:</strong> {scanResult.asset.productName}</p>
-                    <p><strong>Serial:</strong> {scanResult.asset.serialNumber}</p>
-                    <p><strong>Assigned to:</strong> {scanResult.asset.assignedUser || "Unassigned"}</p>
+                {scanResult ? (
+                  <>
+                    {scanResult.status === 'valid' && (
+                      <Alert variant="default"><CheckCircle className="h-4 w-4" /><AlertDescription>Asset Validated: {scanResult.message}</AlertDescription></Alert>
+                    )}
+                    {scanResult.status === 'invalid' && (
+                      <Alert variant="destructive"><XCircle className="h-4 w-4" /><AlertDescription>Asset Invalid: {scanResult.message}</AlertDescription></Alert>
+                    )}
+                    {scanResult.status === 'not_found' && (
+                      <Alert variant="destructive"><HelpCircle className="h-4 w-4" /><AlertDescription>Asset Not Found: {scanResult.message}</AlertDescription></Alert>
+                    )}
+                    {scanResult.asset && (
+                      <div className="space-y-2 border p-4 rounded-md">
+                        <p><strong>Asset ID:</strong> {scanResult.asset.assetId}</p>
+                        <p><strong>Product:</strong> {scanResult.asset.productName}</p>
+                        <p><strong>Serial:</strong> {scanResult.asset.serialNumber}</p>
+                        <p><strong>Assigned to:</strong> {scanResult.asset.assignedUser || "Unassigned"}</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">Click the button to start scanning.</p>
                   </div>
                 )}
-                <Button onClick={handleRescan}>Scan Another Asset</Button>
+                <Button onClick={handleRescan}>
+                  <Camera className="w-4 h-4 mr-2" />
+                  {scanResult ? "Scan Another Asset" : "Start Scanning"}
+                </Button>
               </div>
             )}
           </CardContent>

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -10,10 +11,7 @@ export default defineConfig({
       '~backend': path.resolve(__dirname, '../backend'),
     },
   },
-  plugins: [
-    tailwindcss(),
-    react(),
-  ],
+  plugins: [tailwindcss(), react()],
   mode: "development",
   build: {
     minify: false,

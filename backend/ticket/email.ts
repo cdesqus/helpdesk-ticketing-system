@@ -57,14 +57,15 @@ export async function sendTicketNotification(ticket: Ticket, action: "created" |
       }
       
       // Use environment variables with SSL/TLS defaults
-      const envConfig = {
+      const envConfig: SMTPConfig = {
+        provider: "environment",
         host: envHost,
         port: parseInt(envPort || "587"),
         username: envUser,
         password: envPass,
         fromEmail: envUser,
         useSSL: parseInt(envPort || "587") === 465,
-        useTLS: parseInt(envPort || "587") !== 465, // Use TLS for non-SSL ports
+        useTLS: parseInt(envPort || "587") !== 465,
       };
       
       console.log(`${logPrefix} Using environment variables for SMTP:`, {
@@ -159,13 +160,13 @@ async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, actio
   // Additional TLS settings for different providers
   if (config.provider === 'gmail') {
     transporterConfig.tls = {
-      ...transporterConfig.tls,
-      servername: 'smtp.gmail.com',
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3',
     };
   } else if (config.provider === 'office365') {
     transporterConfig.tls = {
-      ...transporterConfig.tls,
-      servername: 'smtp.office365.com',
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3',
     };
   }
 

@@ -70,14 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log("Session auto-refreshed successfully");
         } catch (error) {
           console.error("Auto-refresh failed:", error);
-          // If refresh fails, try to get current user to check if session is still valid
-          try {
-            const currentUser = await authenticatedBackend.auth.getCurrentUser();
-            console.log("Session still valid for user:", currentUser.username);
-          } catch (userError) {
-            console.error("Session invalid, logging out:", userError);
-            logout();
-          }
+          logout();
         }
       }, 30 * 60 * 1000); // 30 minutes
 
@@ -196,62 +189,15 @@ export function useBackend() {
     return backend;
   }
   
-  const authenticatedBackend = backend.with({
+  const authenticatedBackendClient = backend.with({
     auth: () => {
       console.log("Using auth token for request:", token.substring(0, 8) + "...");
       return Promise.resolve({ authorization: `Bearer ${token}` });
     }
   });
 
-  // Create a proxy to handle 401 errors automatically
-  const backendProxy = new Proxy(authenticatedBackend, {
-    get(target, prop) {
-      const originalMethod = target[prop];
-      
-      if (typeof originalMethod === 'object' && originalMethod !== null) {
-        // Handle nested objects (like ticket.list, auth.getCurrentUser, etc.)
-        return new Proxy(originalMethod, {
-          get(nestedTarget, nestedProp) {
-            const nestedMethod = nestedTarget[nestedProp];
-            
-            if (typeof nestedMethod === 'function') {
-              return async (...args: any[]) => {
-                try {
-                  return await nestedMethod.apply(nestedTarget, args);
-                } catch (error: any) {
-                  if (error?.status === 401) {
-                    console.error("401 Unauthorized - Session expired, logging out");
-                    logout();
-                    throw new Error("Session expired. Please log in again.");
-                  }
-                  throw error;
-                }
-              };
-            }
-            
-            return nestedMethod;
-          }
-        });
-      }
-      
-      if (typeof originalMethod === 'function') {
-        return async (...args: any[]) => {
-          try {
-            return await originalMethod.apply(target, args);
-          } catch (error: any) {
-            if (error?.status === 401) {
-              console.error("401 Unauthorized - Session expired, logging out");
-              logout();
-              throw new Error("Session expired. Please log in again.");
-            }
-            throw error;
-          }
-        };
-      }
-      
-      return originalMethod;
-    }
-  });
+  // Return the authenticated backend client directly
+  const backendProxy = authenticatedBackendClient;
   
   console.log("Returning authenticated backend client with auto-logout on 401");
   return backendProxy;

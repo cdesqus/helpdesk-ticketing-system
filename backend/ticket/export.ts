@@ -369,7 +369,8 @@ async function generatePDFReport(rows: any[], startDate?: string, endDate?: stri
       });
       
       // Footer on all pages
-      const pageCount = doc.page.count;
+      const currentPage = doc.bufferedPageRange();
+      const pageCount = currentPage.count;
       for (let i = 0; i < pageCount; i++) {
         doc.switchToPage(i);
         doc.fontSize(8).font('Helvetica');

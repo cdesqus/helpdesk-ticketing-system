@@ -25,11 +25,11 @@ export const listEngineers = api<void, ListEngineersResponse>(
         full_name: string;
         email: string;
         created_at: Date;
-      }>`SELECT id, full_name as name, email, created_at FROM users WHERE role = 'engineer' AND status = 'active' ORDER BY full_name`;
+      }>`SELECT id, full_name, email, created_at FROM users WHERE role = 'engineer' AND status = 'active' ORDER BY full_name`;
 
       const engineers: Engineer[] = rows.map(row => ({
         id: row.id,
-        name: row.name,
+        name: row.full_name,
         email: row.email,
         createdAt: row.created_at,
       }));

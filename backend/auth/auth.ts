@@ -124,4 +124,5 @@ const auth = authHandler<AuthParams, AuthData>(
   }
 );
 
+export { auth };
 export const gw = new Gateway({ authHandler: auth });

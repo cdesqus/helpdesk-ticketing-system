@@ -70,7 +70,6 @@ export const generateQRCode = api<GenerateQRCodeRequest, GenerateQRCodeResponse>
     const qrCodeDataUrl = await QRCode.toDataURL(qrCodeData, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
-      quality: 0.92,
       margin: 1,
       color: {
         dark: '#000000',
@@ -140,7 +139,6 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
     const qrCodeDataUrl = await QRCode.toDataURL(qrCodeData, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
-      quality: 0.92,
       margin: 1,
       color: {
         dark: '#000000',

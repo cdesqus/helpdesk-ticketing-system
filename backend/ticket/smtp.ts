@@ -242,13 +242,13 @@ async function sendTestEmail(config: SMTPConfig, testEmail: string): Promise<voi
     // Additional TLS settings for different providers
     if (config.provider === 'gmail') {
       transporterConfig.tls = {
-        ...transporterConfig.tls,
-        servername: 'smtp.gmail.com',
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3',
       };
     } else if (config.provider === 'office365') {
       transporterConfig.tls = {
-        ...transporterConfig.tls,
-        servername: 'smtp.office365.com',
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3',
       };
     }
 

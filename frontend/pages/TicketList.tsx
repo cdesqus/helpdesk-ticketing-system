@@ -852,7 +852,10 @@ export default function TicketList() {
                           onCheckedChange={handleSelectAll}
                           ref={(el) => {
                             if (el) {
-                              el.indeterminate = someTicketsSelected;
+                              const inputElement = el.querySelector('button') as any;
+                              if (inputElement) {
+                                inputElement.dataset.indeterminate = someTicketsSelected ? "true" : "false";
+                              }
                             }
                           }}
                         />

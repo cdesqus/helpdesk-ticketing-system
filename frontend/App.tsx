@@ -16,6 +16,13 @@ import CreateTicket from "./pages/CreateTicket";
 import BulkImport from "./pages/BulkImport";
 import UserManagement from "./pages/UserManagement";
 import Settings from "./pages/Settings";
+import AssetList from "./pages/AssetList";
+import AssetDetail from "./pages/AssetDetail";
+import CreateAsset from "./pages/CreateAsset";
+import BulkImportAssets from "./pages/BulkImportAssets";
+import AssetDashboard from "./pages/AssetDashboard";
+import AssetAudit from "./pages/AssetAudit";
+import PrintAssetLabel from "./pages/PrintAssetLabel";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +66,43 @@ function AppRoutes() {
         <Route path="/tickets/:id" element={
           <ProtectedRoute allowedRoles={["admin", "engineer", "reporter"]}>
             <TicketDetail />
+          </ProtectedRoute>
+        } />
+
+        {/* Asset Management Routes */}
+        <Route path="/assets" element={
+          <ProtectedRoute allowedRoles={["admin", "engineer", "reporter"]}>
+            <AssetList />
+          </ProtectedRoute>
+        } />
+        <Route path="/assets/dashboard" element={
+          <ProtectedRoute allowedRoles={["admin", "engineer"]}>
+            <AssetDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/assets/new" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <CreateAsset />
+          </ProtectedRoute>
+        } />
+        <Route path="/assets/bulk-import" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <BulkImportAssets />
+          </ProtectedRoute>
+        } />
+        <Route path="/assets/audit" element={
+          <ProtectedRoute allowedRoles={["admin", "engineer"]}>
+            <AssetAudit />
+          </ProtectedRoute>
+        } />
+        <Route path="/assets/:id" element={
+          <ProtectedRoute allowedRoles={["admin", "engineer", "reporter"]}>
+            <AssetDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/assets/:id/qr-label" element={
+          <ProtectedRoute allowedRoles={["admin", "engineer"]}>
+            <PrintAssetLabel />
           </ProtectedRoute>
         } />
         

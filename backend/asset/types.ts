@@ -20,9 +20,6 @@ export interface Asset {
   qrCodeData?: string;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface License extends Asset {
   totalLicenses?: number;
   usedLicenses?: number;
 }

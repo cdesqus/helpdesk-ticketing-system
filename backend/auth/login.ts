@@ -17,7 +17,13 @@ export interface LoginResponseWithCookie {
 }
 
 // Simple session storage (in production, use Redis or database)
-const activeSessions = new Map<string, { userId: number; username: string; role: UserRole; createdAt: Date }>();
+const activeSessions = new Map<string, { 
+  userId: number; 
+  username: string; 
+  role: UserRole; 
+  createdAt: Date;
+  expiresAt: Date;
+}>();
 
 // Generate a simple session token
 function generateSessionToken(): string {
@@ -42,6 +48,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       
       // Store session
       activeSessions.set(token, {
@@ -49,6 +56,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         username: dummyUser.username,
         role: dummyUser.role,
         createdAt: new Date(),
+        expiresAt: expiresAt,
       });
 
       return {
@@ -56,7 +64,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          expires: expiresAt,
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -78,6 +86,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       
       // Store session
       activeSessions.set(token, {
@@ -85,6 +94,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         username: haryantoDummyUser.username,
         role: haryantoDummyUser.role,
         createdAt: new Date(),
+        expiresAt: expiresAt,
       });
 
       return {
@@ -92,7 +102,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          expires: expiresAt,
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -128,6 +138,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       }
 
       const token = generateSessionToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       
       // Store session
       activeSessions.set(token, {
@@ -135,6 +146,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         username: user.username,
         role: user.role,
         createdAt: new Date(),
+        expiresAt: expiresAt,
       });
 
       const userResponse: User = {
@@ -153,7 +165,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          expires: expiresAt,
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -169,7 +181,18 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
 // Export session management functions for use in auth handler
 export function getSession(token: string) {
-  return activeSessions.get(token);
+  const session = activeSessions.get(token);
+  if (!session) {
+    return null;
+  }
+  
+  // Check if session has expired
+  if (new Date() > session.expiresAt) {
+    activeSessions.delete(token);
+    return null;
+  }
+  
+  return session;
 }
 
 export function removeSession(token: string) {
@@ -182,8 +205,7 @@ export function cleanupExpiredSessions() {
   const expiredTokens: string[] = [];
   
   for (const [token, session] of activeSessions.entries()) {
-    // Sessions expire after 24 hours
-    if (now.getTime() - session.createdAt.getTime() > 24 * 60 * 60 * 1000) {
+    if (now > session.expiresAt) {
       expiredTokens.push(token);
     }
   }

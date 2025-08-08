@@ -96,7 +96,10 @@ export interface ClientOptions {
 /**
  * Import the endpoint handlers to derive the types for the client.
  */
-import { login as api_auth_login_login } from "~backend/auth/login";
+import {
+    getActiveSessions as api_auth_login_getActiveSessions,
+    login as api_auth_login_login
+} from "~backend/auth/login";
 import { logout as api_auth_logout_logout } from "~backend/auth/logout";
 import {
     forgotPassword as api_auth_password_reset_forgotPassword,
@@ -120,6 +123,7 @@ export namespace auth {
             this.changePassword = this.changePassword.bind(this)
             this.createUser = this.createUser.bind(this)
             this.forgotPassword = this.forgotPassword.bind(this)
+            this.getActiveSessions = this.getActiveSessions.bind(this)
             this.getCurrentUser = this.getCurrentUser.bind(this)
             this.listUsers = this.listUsers.bind(this)
             this.login = this.login.bind(this)
@@ -159,6 +163,15 @@ export namespace auth {
         }
 
         /**
+         * Debug endpoint to check active sessions (admin only)
+         */
+        public async getActiveSessions(): Promise<ResponseType<typeof api_auth_login_getActiveSessions>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/auth/sessions`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_auth_login_getActiveSessions>
+        }
+
+        /**
          * Gets current user info.
          */
         public async getCurrentUser(): Promise<ResponseType<typeof api_auth_users_getCurrentUser>> {
@@ -189,8 +202,18 @@ export namespace auth {
          * Logs out a user by invalidating their session.
          */
         public async logout(params: RequestType<typeof api_auth_logout_logout>): Promise<ResponseType<typeof api_auth_logout_logout>> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                token: params.token,
+            }
+
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/auth/logout`, {method: "POST", body: JSON.stringify(params)})
+            const resp = await this.baseClient.callTypedAPI(`/auth/logout`, {headers, method: "POST", body: JSON.stringify(body)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_auth_logout_logout>
         }
 

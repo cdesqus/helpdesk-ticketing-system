@@ -91,6 +91,9 @@ const auth = authHandler<AuthParams, AuthData>(
 
       throw APIError.unauthenticated("invalid session");
     } catch (err) {
+      if (err instanceof APIError) {
+        throw err;
+      }
       throw APIError.unauthenticated("invalid token", err);
     }
   }

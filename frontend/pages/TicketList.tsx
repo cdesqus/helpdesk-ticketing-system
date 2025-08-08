@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useBackend, useAuth } from "../hooks/useAuth";
 import type { TicketStatus, TicketPriority } from "~backend/ticket/types";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -32,6 +33,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   Search, 
   Filter, 
@@ -42,7 +54,10 @@ import {
   Calendar,
   RefreshCw,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -50,6 +65,7 @@ export default function TicketList() {
   const { toast } = useToast();
   const backend = useBackend();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<TicketStatus | "all">("all");
   const [priority, setPriority] = useState<TicketPriority | "all">("all");
@@ -61,6 +77,12 @@ export default function TicketList() {
     startDate: "",
     endDate: "",
   });
+  
+  // Multiple selection state
+  const [selectedTickets, setSelectedTickets] = useState<Set<number>>(new Set());
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  
   const limit = 20;
 
   const { data: ticketsData, isLoading, error, refetch, isError } = useQuery({
@@ -93,6 +115,38 @@ export default function TicketList() {
     queryKey: ["engineers"],
     queryFn: () => backend.ticket.listEngineers(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ticketIds: number[]) => backend.ticket.bulkDeleteTickets({ ticketIds }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-stats"] });
+      setSelectedTickets(new Set());
+      setIsSelectMode(false);
+      setIsBulkDeleteDialogOpen(false);
+      
+      if (result.failedIds.length > 0) {
+        toast({
+          title: "Partial success",
+          description: `${result.deletedCount} tickets deleted successfully. ${result.failedIds.length} tickets failed to delete.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Tickets deleted",
+          description: `${result.deletedCount} tickets have been deleted successfully.`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error("Failed to delete tickets:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete tickets. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleExport = async () => {
@@ -144,6 +198,47 @@ export default function TicketList() {
     refetch();
   };
 
+  const handleSelectModeToggle = () => {
+    setIsSelectMode(!isSelectMode);
+    setSelectedTickets(new Set());
+  };
+
+  const handleTicketSelect = (ticketId: number, checked: boolean) => {
+    const newSelected = new Set(selectedTickets);
+    if (checked) {
+      newSelected.add(ticketId);
+    } else {
+      newSelected.delete(ticketId);
+    }
+    setSelectedTickets(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allTicketIds = new Set(tickets.map(ticket => ticket.id));
+      setSelectedTickets(allTicketIds);
+    } else {
+      setSelectedTickets(new Set());
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedTickets.size === 0) {
+      toast({
+        title: "No tickets selected",
+        description: "Please select tickets to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsBulkDeleteDialogOpen(true);
+  };
+
+  const confirmBulkDelete = () => {
+    const ticketIds = Array.from(selectedTickets);
+    bulkDeleteMutation.mutate(ticketIds);
+  };
+
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case "Urgent": return "destructive";
@@ -170,6 +265,9 @@ export default function TicketList() {
 
   // Show create button only for admin and reporter roles
   const canCreateTicket = user?.role === "admin" || user?.role === "reporter";
+  const canDeleteTickets = user?.role === "admin";
+  const allTicketsSelected = tickets.length > 0 && tickets.every(ticket => selectedTickets.has(ticket.id));
+  const someTicketsSelected = selectedTickets.size > 0 && !allTicketsSelected;
 
   // Debug information
   console.log("TicketList render state:", {
@@ -179,7 +277,9 @@ export default function TicketList() {
     ticketsCount: tickets.length,
     total,
     user: user?.username,
-    userRole: user?.role
+    userRole: user?.role,
+    selectedCount: selectedTickets.size,
+    isSelectMode
   });
 
   return (
@@ -199,6 +299,26 @@ export default function TicketList() {
             )}
             Refresh
           </Button>
+          
+          {canDeleteTickets && (
+            <Button
+              variant={isSelectMode ? "secondary" : "outline"}
+              onClick={handleSelectModeToggle}
+            >
+              {isSelectMode ? (
+                <>
+                  <Square className="w-4 h-4 mr-2" />
+                  Cancel Select
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  Select Multiple
+                </>
+              )}
+            </Button>
+          )}
+          
           {canCreateTicket && (
             <Link to="/tickets/new">
               <Button>
@@ -209,6 +329,72 @@ export default function TicketList() {
           )}
         </div>
       </div>
+
+      {/* Bulk Actions Bar */}
+      {isSelectMode && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedTickets.size} ticket(s) selected
+                </span>
+                {tickets.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSelectAll(!allTicketsSelected)}
+                  >
+                    {allTicketsSelected ? "Deselect All" : "Select All"}
+                  </Button>
+                )}
+              </div>
+              
+              {selectedTickets.size > 0 && (
+                <div className="flex items-center space-x-2">
+                  <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Selected ({selectedTickets.size})
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Selected Tickets</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete {selectedTickets.size} selected ticket(s)? 
+                          This action cannot be undone and will also delete all associated comments.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={confirmBulkDelete}
+                          disabled={bulkDeleteMutation.isPending}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {bulkDeleteMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete {selectedTickets.size} Ticket(s)
+                            </>
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Error State */}
       {isError && (
@@ -244,6 +430,8 @@ export default function TicketList() {
               <p>Error: {isError ? 'Yes' : 'No'}</p>
               <p>Tickets loaded: {tickets.length}</p>
               <p>Total tickets: {total}</p>
+              <p>Selected tickets: {selectedTickets.size}</p>
+              <p>Select mode: {isSelectMode ? 'Yes' : 'No'}</p>
               <p>Current filters: {JSON.stringify({ search, status, priority, assignedEngineer })}</p>
             </div>
           </CardContent>
@@ -449,6 +637,19 @@ export default function TicketList() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {isSelectMode && (
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={allTicketsSelected}
+                          onCheckedChange={handleSelectAll}
+                          ref={(el) => {
+                            if (el) {
+                              el.indeterminate = someTicketsSelected;
+                            }
+                          }}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>ID</TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead>Status</TableHead>
@@ -462,6 +663,16 @@ export default function TicketList() {
                 <TableBody>
                   {tickets.map((ticket) => (
                     <TableRow key={ticket.id}>
+                      {isSelectMode && (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedTickets.has(ticket.id)}
+                            onCheckedChange={(checked) => 
+                              handleTicketSelect(ticket.id, checked as boolean)
+                            }
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium">#{ticket.id}</TableCell>
                       <TableCell className="max-w-xs">
                         <div className="truncate" title={ticket.subject}>

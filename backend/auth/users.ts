@@ -26,6 +26,10 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export interface DeleteUserRequest {
+  id: number;
+}
+
 export interface ListUsersResponse {
   users: User[];
 }
@@ -309,6 +313,47 @@ export const changePassword = api<ChangePasswordRequest, void>(
     } catch (dbError) {
       console.error("Database error in changePassword:", dbError);
       throw APIError.internal("database error - password change temporarily unavailable");
+    }
+  }
+);
+
+// Deletes a user (admin only).
+export const deleteUser = api<DeleteUserRequest, void>(
+  { auth: true, expose: true, method: "DELETE", path: "/auth/users/:id" },
+  async (req) => {
+    const auth = getAuthData()!;
+    if (auth.role !== "admin") {
+      throw APIError.permissionDenied("only admins can delete users");
+    }
+
+    // Don't allow deleting the dummy admin users
+    if (req.id === 1 || req.id === 2) {
+      throw APIError.invalidArgument("cannot delete system administrator");
+    }
+
+    // Don't allow deleting yourself
+    if (req.id.toString() === auth.userID) {
+      throw APIError.invalidArgument("cannot delete your own account");
+    }
+
+    try {
+      // Check if user exists
+      const existingUser = await authDB.queryRow<{
+        id: number;
+        username: string;
+      }>`SELECT id, username FROM users WHERE id = ${req.id}`;
+
+      if (!existingUser) {
+        throw APIError.notFound("user not found");
+      }
+
+      // Delete the user
+      await authDB.exec`DELETE FROM users WHERE id = ${req.id}`;
+
+      console.log(`User ${existingUser.username} (ID: ${req.id}) deleted by admin ${auth.username}`);
+    } catch (dbError) {
+      console.error("Database error in deleteUser:", dbError);
+      throw APIError.internal("database error - user deletion temporarily unavailable");
     }
   }
 );

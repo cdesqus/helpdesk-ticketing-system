@@ -24,6 +24,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -38,7 +49,9 @@ import {
   Edit, 
   Key,
   UserCheck,
-  UserX
+  UserX,
+  Trash2,
+  Loader2
 } from "lucide-react";
 
 export default function UserManagement() {
@@ -49,6 +62,7 @@ export default function UserManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   
   const [createForm, setCreateForm] = useState({
@@ -146,6 +160,27 @@ export default function UserManagement() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => backend.auth.deleteUser({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setIsDeleteDialogOpen(false);
+      setSelectedUser(null);
+      toast({
+        title: "User deleted",
+        description: "User has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Failed to delete user:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -229,6 +264,16 @@ export default function UserManagement() {
     });
   };
 
+  const handleDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!selectedUser) return;
+    deleteMutation.mutate(selectedUser.id);
+  };
+
   const getRoleColor = (role: UserRole) => {
     switch (role) {
       case "admin": return "destructive";
@@ -244,6 +289,16 @@ export default function UserManagement() {
       case "inactive": return "secondary";
       default: return "default";
     }
+  };
+
+  const canDeleteUser = (user: User) => {
+    // Cannot delete system administrators (ID 1 and 2)
+    return user.id !== 1 && user.id !== 2;
+  };
+
+  const canEditUser = (user: User) => {
+    // Cannot edit system administrators (ID 1 and 2)
+    return user.id !== 1 && user.id !== 2;
   };
 
   const users = usersData?.users || [];
@@ -385,7 +440,14 @@ export default function UserManagement() {
                 <TableBody>
                   {users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.username}</TableCell>
+                      <TableCell className="font-medium">
+                        {user.username}
+                        {(user.id === 1 || user.id === 2) && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            System
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{user.fullName}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
@@ -408,20 +470,34 @@ export default function UserManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(user)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleChangePassword(user)}
-                          >
-                            <Key className="w-4 h-4" />
-                          </Button>
+                          {canEditUser(user) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(user)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canEditUser(user) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleChangePassword(user)}
+                            >
+                              <Key className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canDeleteUser(user) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -586,6 +662,39 @@ export default function UserManagement() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete user "{selectedUser?.fullName}" ({selectedUser?.username})? 
+              This action cannot be undone and will permanently remove the user from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete User
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

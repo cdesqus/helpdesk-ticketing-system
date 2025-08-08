@@ -18,7 +18,7 @@ export interface GetStatsResponse {
 // Retrieves ticket statistics and trends with role-based filtering.
 export const getStats = api<GetStatsRequest, GetStatsResponse>(
   { auth: true, expose: true, method: "GET", path: "/tickets/stats" },
-  async (req = {}) => {
+  async (req) => {
     const auth = getAuthData()!;
     console.log(`Getting stats for user: ${auth.username} (role: ${auth.role})`);
     console.log("Request parameters:", req);
@@ -26,7 +26,8 @@ export const getStats = api<GetStatsRequest, GetStatsResponse>(
     // Ensure req is defined and has default values
     const requestParams = req || {};
     const startDate = requestParams.startDate;
-    const endDate = requestParams.endDate;
+    // Default endDate to today if not provided
+    const endDate = requestParams.endDate || new Date().toISOString().split('T')[0];
     
     try {
       let whereClause = "WHERE 1=1";
@@ -54,11 +55,10 @@ export const getStats = api<GetStatsRequest, GetStatsResponse>(
         paramIndex++;
       }
 
-      if (endDate) {
-        whereClause += ` AND created_at <= $${paramIndex}`;
-        params.push(endDate);
-        paramIndex++;
-      }
+      // Always add endDate filter (defaults to today)
+      whereClause += ` AND created_at <= $${paramIndex}`;
+      params.push(endDate + ' 23:59:59'); // Include the entire end date
+      paramIndex++;
 
       console.log(`Stats query where clause: ${whereClause}`);
       console.log(`Stats query params:`, params);

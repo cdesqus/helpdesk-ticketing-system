@@ -182,9 +182,8 @@ export default function Dashboard() {
 
   const statusData = [
     { name: "Open", value: currentStats.open, color: "#ef4444" },
-    { name: "In Progress", value: currentStats.inProgress, color: "#f59e0b" },
-    { name: "Resolved", value: currentStats.resolved, color: "#10b981" },
-    { name: "Closed", value: currentStats.closed, color: "#6b7280" },
+    { name: "Resolved", value: currentStats.resolved, color: "#f59e0b" },
+    { name: "Closed", value: currentStats.closed, color: "#10b981" },
   ].filter(item => item.value > 0); // Only show non-zero values
 
   // Prepare trends data (reverse to show chronologically)
@@ -252,9 +251,9 @@ export default function Dashboard() {
                 <TrendingUp className="h-8 w-8 text-yellow-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">In Progress</p>
+                <p className="text-sm font-medium text-gray-500">Resolved</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {currentStats.inProgress}
+                  {currentStats.resolved}
                 </p>
               </div>
             </div>
@@ -268,9 +267,9 @@ export default function Dashboard() {
                 <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Resolved</p>
+                <p className="text-sm font-medium text-gray-500">Closed</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {currentStats.resolved}
+                  {currentStats.closed}
                 </p>
               </div>
             </div>
@@ -403,11 +402,11 @@ export default function Dashboard() {
               <p className="text-sm text-gray-600">Need Attention</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-yellow-600">{currentStats.inProgress}</p>
-              <p className="text-sm text-gray-600">In Progress</p>
+              <p className="text-2xl font-bold text-yellow-600">{currentStats.resolved}</p>
+              <p className="text-sm text-gray-600">Resolved</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-green-600">{currentStats.resolved + currentStats.closed}</p>
+              <p className="text-2xl font-bold text-green-600">{currentStats.closed}</p>
               <p className="text-sm text-gray-600">Completed</p>
             </div>
           </div>

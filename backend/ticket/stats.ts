@@ -1,13 +1,7 @@
 import { api } from "encore.dev/api";
-import { Query } from "encore.dev/api";
 import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { TicketStats, TicketTrend, EngineerStats } from "./types";
-
-export interface GetStatsRequest {
-  startDate?: Query<string>;
-  endDate?: Query<string>;
-}
 
 export interface GetStatsResponse {
   stats: TicketStats;
@@ -16,20 +10,11 @@ export interface GetStatsResponse {
 }
 
 // Retrieves ticket statistics and trends with role-based filtering.
-export const getStats = api<GetStatsRequest, GetStatsResponse>(
+export const getStats = api<void, GetStatsResponse>(
   { auth: true, expose: true, method: "GET", path: "/tickets/stats" },
-  async (req) => {
+  async () => {
     const auth = getAuthData()!;
     console.log(`Getting stats for user: ${auth.username} (role: ${auth.role})`);
-    console.log("Request parameters:", req);
-    
-    // Safely handle request parameters with defaults
-    const requestParams = req || {};
-    const startDate = requestParams.startDate || undefined;
-    // Default endDate to today if not provided
-    const endDate = requestParams.endDate || new Date().toISOString().split('T')[0];
-    
-    console.log("Processed parameters:", { startDate, endDate });
     
     try {
       let whereClause = "WHERE 1=1";
@@ -49,18 +34,6 @@ export const getStats = api<GetStatsRequest, GetStatsResponse>(
         paramIndex++;
       }
       // Admins can see all ticket stats (no additional filtering)
-
-      // Add date filters if they are provided
-      if (startDate) {
-        whereClause += ` AND created_at >= $${paramIndex}`;
-        params.push(startDate + ' 00:00:00'); // Include the entire start date
-        paramIndex++;
-      }
-
-      // Always add endDate filter (defaults to today)
-      whereClause += ` AND created_at <= $${paramIndex}`;
-      params.push(endDate + ' 23:59:59'); // Include the entire end date
-      paramIndex++;
 
       console.log(`Stats query where clause: ${whereClause}`);
       console.log(`Stats query params:`, params);
@@ -94,15 +67,16 @@ export const getStats = api<GetStatsRequest, GetStatsResponse>(
 
       console.log(`Stats calculated:`, stats);
 
-      // Get daily trends for the last 30 days
+      // Get daily trends for the last 7 days
       const trendsQuery = `
         SELECT 
           DATE(created_at) as date,
           COUNT(*) as count
         FROM tickets ${whereClause}
+        AND created_at >= CURRENT_DATE - INTERVAL '7 days'
         GROUP BY DATE(created_at)
         ORDER BY date DESC
-        LIMIT 30
+        LIMIT 7
       `;
 
       const trendRows = await ticketDB.rawQueryAll<{
@@ -125,7 +99,7 @@ export const getStats = api<GetStatsRequest, GetStatsResponse>(
         FROM tickets ${whereClause}
         GROUP BY assigned_engineer
         ORDER BY count DESC
-        LIMIT 20
+        LIMIT 10
       `;
 
       const engineerRows = await ticketDB.rawQueryAll<{

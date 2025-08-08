@@ -78,10 +78,10 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
-      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
       const now = new Date();
+      const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours from now
       
-      // Store session
+      // Store session with 8-hour expiration
       activeSessions.set(token, {
         userId: dummyUser.id,
         username: dummyUser.username,
@@ -91,14 +91,14 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         lastAccessed: now,
       });
 
-      console.log(`Admin user logged in successfully with token: ${token.substring(0, 8)}...`);
+      console.log(`Admin user logged in successfully with token: ${token.substring(0, 8)}... (expires: ${expiresAt.toISOString()})`);
 
       return {
         user: dummyUser,
         token,
         session: {
           value: token,
-          expires: expiresAt,
+          expires: expiresAt, // Set cookie expiration to 8 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -120,10 +120,10 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
-      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
       const now = new Date();
+      const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours from now
       
-      // Store session
+      // Store session with 8-hour expiration
       activeSessions.set(token, {
         userId: haryantoDummyUser.id,
         username: haryantoDummyUser.username,
@@ -133,14 +133,14 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         lastAccessed: now,
       });
 
-      console.log(`Haryanto user logged in successfully with token: ${token.substring(0, 8)}...`);
+      console.log(`Haryanto user logged in successfully with token: ${token.substring(0, 8)}... (expires: ${expiresAt.toISOString()})`);
 
       return {
         user: haryantoDummyUser,
         token,
         session: {
           value: token,
-          expires: expiresAt,
+          expires: expiresAt, // Set cookie expiration to 8 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -179,10 +179,10 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       }
 
       const token = generateSessionToken();
-      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
       const now = new Date();
+      const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours from now
       
-      // Store session
+      // Store session with 8-hour expiration
       activeSessions.set(token, {
         userId: user.id,
         username: user.username,
@@ -203,14 +203,14 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         updatedAt: user.updated_at,
       };
 
-      console.log(`Database user ${user.username} logged in successfully with token: ${token.substring(0, 8)}...`);
+      console.log(`Database user ${user.username} logged in successfully with token: ${token.substring(0, 8)}... (expires: ${expiresAt.toISOString()})`);
 
       return {
         user: userResponse,
         token,
         session: {
           value: token,
-          expires: expiresAt,
+          expires: expiresAt, // Set cookie expiration to 8 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -226,11 +226,13 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 // Export session management functions for use in auth handler
 export function getSession(token: string) {
   if (!token) {
+    console.log("getSession: No token provided");
     return null;
   }
 
   const session = activeSessions.get(token);
   if (!session) {
+    console.log("getSession: Session not found for token:", token.substring(0, 8) + "...");
     return null;
   }
   
@@ -238,24 +240,26 @@ export function getSession(token: string) {
   const now = new Date();
   if (now > session.expiresAt) {
     activeSessions.delete(token);
-    console.log("Session expired and removed:", token.substring(0, 8) + "...");
+    console.log("getSession: Session expired and removed:", token.substring(0, 8) + "...", "expired at:", session.expiresAt.toISOString(), "current time:", now.toISOString());
     return null;
   }
   
-  // Update last accessed time
+  // Update last accessed time to extend session activity
   session.lastAccessed = now;
   
+  console.log("getSession: Valid session found for token:", token.substring(0, 8) + "...", "expires at:", session.expiresAt.toISOString());
   return session;
 }
 
 export function removeSession(token: string) {
   if (token) {
     const deleted = activeSessions.delete(token);
-    console.log(`Session removed: ${token.substring(0, 8)}... (existed: ${deleted})`);
+    console.log(`removeSession: Session removed: ${token.substring(0, 8)}... (existed: ${deleted})`);
   }
 }
 
 export function getAllActiveSessions() {
+  const now = new Date();
   return Array.from(activeSessions.entries()).map(([token, session]) => ({
     token: token.substring(0, 8) + "...",
     userId: session.userId,
@@ -264,6 +268,8 @@ export function getAllActiveSessions() {
     createdAt: session.createdAt,
     expiresAt: session.expiresAt,
     lastAccessed: session.lastAccessed,
+    isExpired: now > session.expiresAt,
+    timeUntilExpiry: session.expiresAt.getTime() - now.getTime(),
   }));
 }
 
@@ -272,5 +278,42 @@ export const getActiveSessions = api<void, { sessions: any[] }>(
   { auth: true, expose: true, method: "GET", path: "/auth/sessions" },
   async () => {
     return { sessions: getAllActiveSessions() };
+  }
+);
+
+// Endpoint to extend session (refresh session expiration)
+export const refreshSession = api<void, { message: string; expiresAt: Date }>(
+  { auth: true, expose: true, method: "POST", path: "/auth/refresh" },
+  async (req, { headers }) => {
+    // Extract token from authorization header or cookie
+    const authHeader = headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "");
+    
+    if (!token) {
+      throw APIError.unauthenticated("no session token provided");
+    }
+
+    const session = activeSessions.get(token);
+    if (!session) {
+      throw APIError.unauthenticated("session not found");
+    }
+
+    const now = new Date();
+    if (now > session.expiresAt) {
+      activeSessions.delete(token);
+      throw APIError.unauthenticated("session has expired");
+    }
+
+    // Extend session by another 8 hours
+    const newExpiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    session.expiresAt = newExpiresAt;
+    session.lastAccessed = now;
+
+    console.log(`Session refreshed for user ${session.username}, new expiry: ${newExpiresAt.toISOString()}`);
+
+    return {
+      message: "Session refreshed successfully",
+      expiresAt: newExpiresAt,
+    };
   }
 );

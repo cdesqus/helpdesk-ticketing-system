@@ -13,11 +13,12 @@ export const listEngineers = api<void, ListEngineersResponse>(
   async () => {
     const auth = getAuthData()!;
     
-    // Only admins and engineers can list engineers
-    if (auth.role === "reporter") {
-      throw APIError.permissionDenied("reporters cannot list engineers");
-    }
-
+    // Allow all authenticated users to list engineers
+    // This is needed for ticket creation and assignment workflows
+    // Reporters need to see engineers when creating tickets
+    // Engineers need to see other engineers for collaboration
+    // Admins need full access for management
+    
     try {
       const rows = await authDB.queryAll<{
         id: number;

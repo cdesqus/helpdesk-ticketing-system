@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { useBackend } from "../hooks/useAuth";
+import { useBackend, useAuth } from "../hooks/useAuth";
 import type { TicketStatus, TicketPriority } from "~backend/ticket/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export default function CreateTicket() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const backend = useBackend();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // Set default date to current date and time
@@ -40,9 +41,11 @@ export default function CreateTicket() {
     customDate: defaultDateTime,
   });
 
+  // Only fetch engineers if user is admin (reporters don't need to assign engineers)
   const { data: engineersData, isLoading: engineersLoading } = useQuery({
     queryKey: ["engineers"],
     queryFn: () => backend.ticket.listEngineers(),
+    enabled: user?.role === "admin", // Only fetch for admins
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -107,6 +110,7 @@ export default function CreateTicket() {
   };
 
   const engineers = engineersData?.engineers || [];
+  const showEngineerAssignment = user?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -156,24 +160,49 @@ export default function CreateTicket() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => setFormData({ ...formData, status: value as TicketStatus })}
-                  disabled={createMutation.isPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Open">Open</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Resolved">Resolved</SelectItem>
-                    <SelectItem value="Closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {showEngineerAssignment && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) => setFormData({ ...formData, status: value as TicketStatus })}
+                      disabled={createMutation.isPending}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Open">Open</SelectItem>
+                        <SelectItem value="In Progress">In Progress</SelectItem>
+                        <SelectItem value="Resolved">Resolved</SelectItem>
+                        <SelectItem value="Closed">Closed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="assignedEngineer">Assigned Engineer</Label>
+                    <Select
+                      value={formData.assignedEngineer}
+                      onValueChange={(value) => setFormData({ ...formData, assignedEngineer: value })}
+                      disabled={createMutation.isPending || engineersLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an engineer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {engineers.map((engineer) => (
+                          <SelectItem key={engineer.id} value={engineer.name}>
+                            {engineer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
@@ -195,27 +224,6 @@ export default function CreateTicket() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="assignedEngineer">Assigned Engineer</Label>
-                <Select
-                  value={formData.assignedEngineer}
-                  onValueChange={(value) => setFormData({ ...formData, assignedEngineer: value })}
-                  disabled={createMutation.isPending || engineersLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an engineer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {engineers.map((engineer) => (
-                      <SelectItem key={engineer.id} value={engineer.name}>
-                        {engineer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="reporterName">Reporter Name</Label>
                 <Input
                   id="reporterName"
@@ -224,6 +232,11 @@ export default function CreateTicket() {
                   placeholder="Name of the person reporting the issue"
                   disabled={createMutation.isPending}
                 />
+                {user?.role === "reporter" && (
+                  <p className="text-xs text-gray-500">
+                    Leave empty to use your name automatically
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -236,6 +249,11 @@ export default function CreateTicket() {
                   placeholder="email@example.com"
                   disabled={createMutation.isPending}
                 />
+                {user?.role === "reporter" && (
+                  <p className="text-xs text-gray-500">
+                    Leave empty to use your email automatically
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -262,6 +280,18 @@ export default function CreateTicket() {
                 disabled={createMutation.isPending}
               />
             </div>
+
+            {user?.role === "reporter" && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Note for Reporters:</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Your ticket will be created with "Open" status</li>
+                  <li>• An administrator will assign an engineer to your ticket</li>
+                  <li>• You will receive email notifications about updates (if email is configured)</li>
+                  <li>• You can track progress and add comments to your ticket</li>
+                </ul>
+              </div>
+            )}
 
             <div className="flex justify-end space-x-4">
               <Button

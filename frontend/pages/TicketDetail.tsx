@@ -93,10 +93,11 @@ export default function TicketDetail() {
     staleTime: 30 * 1000, // 30 seconds
   });
 
+  // Only fetch engineers if user is admin
   const { data: engineersData } = useQuery({
     queryKey: ["engineers"],
     queryFn: () => backend.ticket.listEngineers(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && user?.role === "admin",
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -284,6 +285,17 @@ export default function TicketDetail() {
     }
   };
 
+  // Check if user can edit this ticket
+  const canEdit = user?.role === "admin" || 
+    (user?.role === "engineer" && ticket?.assignedEngineer === user.fullName);
+
+  // Check if user can delete this ticket
+  const canDelete = user?.role === "admin";
+
+  // Check if user can close this ticket
+  const canClose = user?.role === "admin" || 
+    (user?.role === "engineer" && ticket?.assignedEngineer === user.fullName);
+
   // Error state
   if (isError) {
     return (
@@ -367,6 +379,7 @@ export default function TicketDetail() {
   }
 
   const engineers = engineersData?.engineers || [];
+  const showEngineerAssignment = user?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -388,11 +401,13 @@ export default function TicketDetail() {
         <div className="flex items-center space-x-2">
           {!isEditing ? (
             <>
-              <Button onClick={handleEdit}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
-              {ticket.status !== "Closed" && (
+              {canEdit && (
+                <Button onClick={handleEdit}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+              {canClose && ticket.status !== "Closed" && (
                 <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
@@ -436,10 +451,12 @@ export default function TicketDetail() {
                   </DialogContent>
                 </Dialog>
               )}
-              <Button variant="destructive" onClick={handleDelete}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
+              {canDelete && (
+                <Button variant="destructive" onClick={handleDelete}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -557,29 +574,38 @@ export default function TicketDetail() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Assigned Engineer</Label>
-                {isEditing ? (
-                  <Select
-                    value={formData.assignedEngineer}
-                    onValueChange={(value) => setFormData({ ...formData, assignedEngineer: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an engineer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {engineers.map((engineer) => (
-                        <SelectItem key={engineer.id} value={engineer.name}>
-                          {engineer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
+              {showEngineerAssignment && (
+                <div className="space-y-2">
+                  <Label>Assigned Engineer</Label>
+                  {isEditing ? (
+                    <Select
+                      value={formData.assignedEngineer}
+                      onValueChange={(value) => setFormData({ ...formData, assignedEngineer: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an engineer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {engineers.map((engineer) => (
+                          <SelectItem key={engineer.id} value={engineer.name}>
+                            {engineer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm">{ticket.assignedEngineer || "Unassigned"}</p>
+                  )}
+                </div>
+              )}
+
+              {!showEngineerAssignment && (
+                <div className="space-y-2">
+                  <Label>Assigned Engineer</Label>
                   <p className="text-sm">{ticket.assignedEngineer || "Unassigned"}</p>
-                )}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

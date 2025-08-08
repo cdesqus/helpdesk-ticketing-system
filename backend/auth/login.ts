@@ -1,12 +1,9 @@
 import { api, APIError } from "encore.dev/api";
 import { Cookie } from "encore.dev/api";
-import { secret } from "encore.dev/config";
 import { authDB } from "./db";
 import type { User, LoginResponse, UserRole, UserStatus } from "./types";
 import * as bcrypt from "bcrypt";
-import * as jwt from "jsonwebtoken";
-
-const jwtSecret = secret("JWTSecret");
+import * as crypto from "crypto";
 
 export interface LoginRequest {
   username: string;
@@ -17,6 +14,14 @@ export interface LoginResponseWithCookie {
   user: User;
   token: string;
   session: Cookie<"session">;
+}
+
+// Simple session storage (in production, use Redis or database)
+const activeSessions = new Map<string, { userId: number; username: string; role: UserRole; createdAt: Date }>();
+
+// Generate a simple session token
+function generateSessionToken(): string {
+  return crypto.randomBytes(32).toString('hex');
 }
 
 // Authenticates a user with username and password.
@@ -36,11 +41,15 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         updatedAt: new Date(),
       };
 
-      const token = jwt.sign(
-        { userId: dummyUser.id, username: dummyUser.username, role: dummyUser.role },
-        jwtSecret(),
-        { expiresIn: "24h" }
-      );
+      const token = generateSessionToken();
+      
+      // Store session
+      activeSessions.set(token, {
+        userId: dummyUser.id,
+        username: dummyUser.username,
+        role: dummyUser.role,
+        createdAt: new Date(),
+      });
 
       return {
         user: dummyUser,
@@ -68,11 +77,15 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         updatedAt: new Date(),
       };
 
-      const token = jwt.sign(
-        { userId: haryantoDummyUser.id, username: haryantoDummyUser.username, role: haryantoDummyUser.role },
-        jwtSecret(),
-        { expiresIn: "24h" }
-      );
+      const token = generateSessionToken();
+      
+      // Store session
+      activeSessions.set(token, {
+        userId: haryantoDummyUser.id,
+        username: haryantoDummyUser.username,
+        role: haryantoDummyUser.role,
+        createdAt: new Date(),
+      });
 
       return {
         user: haryantoDummyUser,
@@ -114,11 +127,15 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         throw APIError.unauthenticated("invalid username or password");
       }
 
-      const token = jwt.sign(
-        { userId: user.id, username: user.username, role: user.role },
-        jwtSecret(),
-        { expiresIn: "24h" }
-      );
+      const token = generateSessionToken();
+      
+      // Store session
+      activeSessions.set(token, {
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+        createdAt: new Date(),
+      });
 
       const userResponse: User = {
         id: user.id,
@@ -149,3 +166,32 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
     }
   }
 );
+
+// Export session management functions for use in auth handler
+export function getSession(token: string) {
+  return activeSessions.get(token);
+}
+
+export function removeSession(token: string) {
+  activeSessions.delete(token);
+}
+
+// Clean up expired sessions (run periodically)
+export function cleanupExpiredSessions() {
+  const now = new Date();
+  const expiredTokens: string[] = [];
+  
+  for (const [token, session] of activeSessions.entries()) {
+    // Sessions expire after 24 hours
+    if (now.getTime() - session.createdAt.getTime() > 24 * 60 * 60 * 1000) {
+      expiredTokens.push(token);
+    }
+  }
+  
+  for (const token of expiredTokens) {
+    activeSessions.delete(token);
+  }
+}
+
+// Clean up expired sessions every hour
+setInterval(cleanupExpiredSessions, 60 * 60 * 1000);

@@ -147,16 +147,13 @@ export default function Login() {
         {/* Demo Credentials */}
         <Card className="mt-6 bg-blue-50 border-blue-200">
           <CardContent className="pt-6">
-            <h3 className="font-medium text-blue-900 mb-3">Demo Credentials</h3>
+            <h3 className="font-medium text-blue-900 mb-3">Temporary Login</h3>
             <div className="space-y-2 text-sm text-blue-800">
               <div>
                 <strong>Admin:</strong> admin / admin123
               </div>
-              <div>
-                <strong>Engineer:</strong> Create via admin panel
-              </div>
-              <div>
-                <strong>Reporter:</strong> Create via admin panel
+              <div className="text-xs text-blue-600 mt-2">
+                This is a temporary login solution. Database authentication will be available once the system is fully configured.
               </div>
             </div>
           </CardContent>

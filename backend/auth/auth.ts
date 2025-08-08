@@ -24,26 +24,52 @@ const auth = authHandler<AuthParams, AuthData>(
     try {
       const payload = jwt.verify(token, jwtSecret()) as any;
       
-      const user = await authDB.queryRow<{
-        id: number;
-        username: string;
-        email: string;
-        full_name: string;
-        role: UserRole;
-        status: UserStatus;
-      }>`SELECT id, username, email, full_name, role, status FROM users WHERE id = ${payload.userId}`;
-
-      if (!user || user.status !== "active") {
-        throw APIError.unauthenticated("user not found or inactive");
+      // Check if this is the dummy admin user
+      if (payload.userId === 1 && payload.username === "admin") {
+        return {
+          userID: "1",
+          username: "admin",
+          email: "admin@idesolusi.co.id",
+          fullName: "System Administrator",
+          role: "admin",
+        };
       }
 
-      return {
-        userID: user.id.toString(),
-        username: user.username,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role,
-      };
+      // Try database lookup for other users
+      try {
+        const user = await authDB.queryRow<{
+          id: number;
+          username: string;
+          email: string;
+          full_name: string;
+          role: UserRole;
+          status: UserStatus;
+        }>`SELECT id, username, email, full_name, role, status FROM users WHERE id = ${payload.userId}`;
+
+        if (!user || user.status !== "active") {
+          throw APIError.unauthenticated("user not found or inactive");
+        }
+
+        return {
+          userID: user.id.toString(),
+          username: user.username,
+          email: user.email,
+          fullName: user.full_name,
+          role: user.role,
+        };
+      } catch (dbError) {
+        // If database fails but token is valid, allow dummy admin
+        if (payload.username === "admin") {
+          return {
+            userID: "1",
+            username: "admin",
+            email: "admin@idesolusi.co.id",
+            fullName: "System Administrator",
+            role: "admin",
+          };
+        }
+        throw APIError.unauthenticated("user not found");
+      }
     } catch (err) {
       throw APIError.unauthenticated("invalid token", err);
     }

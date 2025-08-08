@@ -21,11 +21,14 @@ export const create = api<CreateTicketRequest, Ticket>(
   { auth: true, expose: true, method: "POST", path: "/tickets" },
   async (req) => {
     const auth = getAuthData()!;
+    console.log(`Creating ticket for user: ${auth.username} (role: ${auth.role})`);
+    console.log("Ticket data:", req);
+    
     const now = new Date();
     const customDate = req.customDate || now;
     
     // Handle "unassigned" value from frontend
-    const assignedEngineer = req.assignedEngineer === "unassigned" ? null : req.assignedEngineer;
+    const assignedEngineer = req.assignedEngineer === "unassigned" || !req.assignedEngineer ? null : req.assignedEngineer;
     
     // Set reporter info based on user role
     let reporterName = req.reporterName || auth.fullName;
@@ -43,6 +46,8 @@ export const create = api<CreateTicketRequest, Ticket>(
     }
 
     try {
+      console.log("Attempting to insert ticket into database...");
+      
       const row = await ticketDB.queryRow<{
         id: number;
         subject: string;
@@ -70,8 +75,11 @@ export const create = api<CreateTicketRequest, Ticket>(
       `;
 
       if (!row) {
-        throw APIError.internal("Failed to create ticket");
+        console.error("Database insert returned no row");
+        throw APIError.internal("Failed to create ticket - no data returned");
       }
+
+      console.log("Database insert successful, row:", row);
 
       const ticket: Ticket = {
         id: row.id,
@@ -89,12 +97,13 @@ export const create = api<CreateTicketRequest, Ticket>(
         customDate: row.custom_date || undefined,
       };
 
-      console.log("Ticket created successfully:", ticket.id);
+      console.log("Ticket created successfully:", ticket);
 
       // Send email notification if reporter has email
       if (reporterEmail) {
         try {
           await sendTicketNotification(ticket, "created");
+          console.log("Email notification sent successfully");
         } catch (error) {
           console.error("Failed to send email notification:", error);
           // Don't fail ticket creation if email fails

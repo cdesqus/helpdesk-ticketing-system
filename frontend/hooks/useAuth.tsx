@@ -31,6 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem("auth_token");
     const storedUser = localStorage.getItem("auth_user");
     
+    console.log("Checking stored auth data:", { hasToken: !!storedToken, hasUser: !!storedUser });
+    
     if (storedToken && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
@@ -51,6 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("Attempting login for user:", username);
       const response = await backend.auth.login({ username, password });
+      
+      console.log("Login response received:", { 
+        user: response.user.username, 
+        hasToken: !!response.token 
+      });
       
       setUser(response.user);
       setToken(response.token);
@@ -93,6 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user && !!token,
   };
 
+  console.log("Auth context value:", { 
+    hasUser: !!user, 
+    hasToken: !!token, 
+    isLoading, 
+    isAuthenticated: value.isAuthenticated,
+    username: user?.username,
+    role: user?.role
+  });
+
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -102,16 +118,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // Returns the authenticated backend client
 export function useBackend() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  
+  console.log("useBackend called:", { hasToken: !!token, username: user?.username });
   
   if (!token) {
+    console.log("No token available, returning unauthenticated backend client");
     return backend;
   }
   
-  return backend.with({
+  const authenticatedBackend = backend.with({
     auth: () => {
-      console.log("Using auth token:", token.substring(0, 8) + "...");
+      console.log("Using auth token for request:", token.substring(0, 8) + "...");
       return Promise.resolve({ authorization: `Bearer ${token}` });
     }
   });
+  
+  console.log("Returning authenticated backend client");
+  return authenticatedBackend;
 }

@@ -25,6 +25,7 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
   { auth: true, expose: true, method: "GET", path: "/tickets" },
   async (req) => {
     const auth = getAuthData()!;
+    console.log(`Listing tickets for user: ${auth.username} (role: ${auth.role})`);
     
     try {
       let whereClause = "WHERE 1=1";
@@ -58,9 +59,13 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
       }
 
       if (req.assignedEngineer && auth.role === "admin") {
-        whereClause += ` AND assigned_engineer = $${paramIndex}`;
-        params.push(req.assignedEngineer);
-        paramIndex++;
+        if (req.assignedEngineer === "Unassigned") {
+          whereClause += ` AND assigned_engineer IS NULL`;
+        } else {
+          whereClause += ` AND assigned_engineer = $${paramIndex}`;
+          params.push(req.assignedEngineer);
+          paramIndex++;
+        }
       }
 
       if (req.search) {
@@ -84,10 +89,16 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
       const limit = req.limit || 50;
       const offset = req.offset || 0;
 
+      console.log(`Query where clause: ${whereClause}`);
+      console.log(`Query params:`, params);
+
       // Get total count
       const countQuery = `SELECT COUNT(*) as count FROM tickets ${whereClause}`;
+      console.log(`Count query: ${countQuery}`);
+      
       const countResult = await ticketDB.rawQueryRow<{ count: number }>(countQuery, ...params);
       const total = countResult?.count || 0;
+      console.log(`Total tickets found: ${total}`);
 
       // Get tickets
       const query = `
@@ -96,6 +107,9 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
       params.push(limit, offset);
+
+      console.log(`Main query: ${query}`);
+      console.log(`Final params:`, params);
 
       const rows = await ticketDB.rawQueryAll<{
         id: number;
@@ -112,6 +126,8 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
         resolved_at: Date | null;
         custom_date: Date | null;
       }>(query, ...params);
+
+      console.log(`Database returned ${rows.length} rows`);
 
       const tickets: Ticket[] = rows.map(row => ({
         id: row.id,

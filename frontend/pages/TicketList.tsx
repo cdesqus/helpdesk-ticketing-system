@@ -41,7 +41,8 @@ import {
   Eye,
   Calendar,
   RefreshCw,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -62,23 +63,30 @@ export default function TicketList() {
   });
   const limit = 20;
 
-  const { data: ticketsData, isLoading, error, refetch } = useQuery({
+  const { data: ticketsData, isLoading, error, refetch, isError } = useQuery({
     queryKey: ["tickets", search, status, priority, assignedEngineer, page],
     queryFn: async () => {
       console.log("Fetching tickets with params:", { search, status, priority, assignedEngineer, page });
-      const result = await backend.ticket.list({
-        search: search || undefined,
-        status: status || undefined,
-        priority: priority || undefined,
-        assignedEngineer: assignedEngineer || undefined,
-        limit,
-        offset: page * limit,
-      });
-      console.log("Tickets fetched:", result);
-      return result;
+      try {
+        const result = await backend.ticket.list({
+          search: search || undefined,
+          status: status || undefined,
+          priority: priority || undefined,
+          assignedEngineer: assignedEngineer || undefined,
+          limit,
+          offset: page * limit,
+        });
+        console.log("Tickets fetched successfully:", result);
+        return result;
+      } catch (error) {
+        console.error("Error fetching tickets:", error);
+        throw error;
+      }
     },
     staleTime: 30 * 1000, // 30 seconds
     refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   const { data: engineersData } = useQuery({
@@ -163,6 +171,17 @@ export default function TicketList() {
   // Show create button only for admin and reporter roles
   const canCreateTicket = user?.role === "admin" || user?.role === "reporter";
 
+  // Debug information
+  console.log("TicketList render state:", {
+    isLoading,
+    isError,
+    error,
+    ticketsCount: tickets.length,
+    total,
+    user: user?.username,
+    userRole: user?.role
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -192,20 +211,40 @@ export default function TicketList() {
       </div>
 
       {/* Error State */}
-      {error && (
+      {isError && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-800 font-medium">Failed to load tickets</p>
-                <p className="text-red-600 text-sm">
-                  {error instanceof Error ? error.message : "An error occurred while loading tickets"}
-                </p>
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
+                <div>
+                  <p className="text-red-800 font-medium">Failed to load tickets</p>
+                  <p className="text-red-600 text-sm">
+                    {error instanceof Error ? error.message : "An error occurred while loading tickets"}
+                  </p>
+                </div>
               </div>
               <Button variant="outline" onClick={handleRefresh}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Retry
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Debug Information (only in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <h4 className="font-medium text-blue-900 mb-2">Debug Information</h4>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p>User: {user?.username} ({user?.role})</p>
+              <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
+              <p>Error: {isError ? 'Yes' : 'No'}</p>
+              <p>Tickets loaded: {tickets.length}</p>
+              <p>Total tickets: {total}</p>
+              <p>Current filters: {JSON.stringify({ search, status, priority, assignedEngineer })}</p>
             </div>
           </CardContent>
         </Card>
@@ -376,6 +415,10 @@ export default function TicketList() {
         <CardContent>
           {isLoading ? (
             <div className="space-y-4">
+              <div className="text-center py-4">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                <p className="text-gray-600">Loading tickets...</p>
+              </div>
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="h-16 bg-gray-200 rounded animate-pulse"></div>
               ))}

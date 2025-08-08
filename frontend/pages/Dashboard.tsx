@@ -34,6 +34,7 @@ export default function Dashboard() {
     queryFn: async () => {
       console.log("Fetching dashboard stats...");
       try {
+        // Call getStats without any parameters to get all stats
         const result = await backend.ticket.getStats();
         console.log("Dashboard stats fetched successfully:", result);
         return result;

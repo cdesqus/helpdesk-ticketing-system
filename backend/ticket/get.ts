@@ -1,0 +1,49 @@
+import { api, APIError } from "encore.dev/api";
+import { ticketDB } from "./db";
+import type { Ticket, TicketStatus, TicketPriority } from "./types";
+
+export interface GetTicketRequest {
+  id: number;
+}
+
+// Retrieves a specific ticket by ID.
+export const get = api<GetTicketRequest, Ticket>(
+  { expose: true, method: "GET", path: "/tickets/:id" },
+  async (req) => {
+    const row = await ticketDB.queryRow<{
+      id: number;
+      subject: string;
+      description: string;
+      status: TicketStatus;
+      priority: TicketPriority;
+      assigned_engineer: string | null;
+      reporter_name: string;
+      reporter_email: string | null;
+      company_name: string | null;
+      created_at: Date;
+      updated_at: Date;
+      resolved_at: Date | null;
+      custom_date: Date | null;
+    }>`SELECT * FROM tickets WHERE id = ${req.id}`;
+
+    if (!row) {
+      throw APIError.notFound("ticket not found");
+    }
+
+    return {
+      id: row.id,
+      subject: row.subject,
+      description: row.description,
+      status: row.status,
+      priority: row.priority,
+      assignedEngineer: row.assigned_engineer || undefined,
+      reporterName: row.reporter_name,
+      reporterEmail: row.reporter_email || undefined,
+      companyName: row.company_name || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      resolvedAt: row.resolved_at || undefined,
+      customDate: row.custom_date || undefined,
+    };
+  }
+);

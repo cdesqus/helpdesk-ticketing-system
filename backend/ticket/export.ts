@@ -368,13 +368,19 @@ async function generatePDFReport(rows: any[], startDate?: string, endDate?: stri
         yPosition += 3;
       });
       
-      // Footer on last page
-      const pageCount = doc.bufferedPageRange().count;
+      // Footer on all pages
+      const pageCount = doc.page.count;
       for (let i = 0; i < pageCount; i++) {
         doc.switchToPage(i);
         doc.fontSize(8).font('Helvetica');
-        doc.text(`Page ${i + 1} of ${pageCount}`, 50, 780);
-        doc.text('IDESOLUSI Helpdesk System - Confidential', 400, 780);
+        doc.text(`Page ${i + 1} of ${pageCount}`, 50, 780, {
+          align: 'left',
+          width: 500
+        });
+        doc.text('IDESOLUSI Helpdesk System - Confidential', 50, 780, {
+          align: 'right',
+          width: 500
+        });
       }
       
       doc.end();

@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
 import CreateTicket from "./pages/CreateTicket";
+import BulkImport from "./pages/BulkImport";
 import UserManagement from "./pages/UserManagement";
 import Settings from "./pages/Settings";
 
@@ -46,6 +47,12 @@ function AppRoutes() {
         <Route path="/tickets/new" element={
           <ProtectedRoute allowedRoles={["admin", "reporter"]}>
             <CreateTicket />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/tickets/bulk-import" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <BulkImport />
           </ProtectedRoute>
         } />
         

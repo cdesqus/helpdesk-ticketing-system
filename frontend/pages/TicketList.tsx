@@ -44,6 +44,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Search, 
   Filter, 
@@ -57,7 +63,10 @@ import {
   AlertCircle,
   Trash2,
   CheckSquare,
-  Square
+  Square,
+  Upload,
+  FileSpreadsheet,
+  ChevronDown
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -271,6 +280,7 @@ export default function TicketList() {
   // Show create button only for admin and reporter roles
   const canCreateTicket = user?.role === "admin" || user?.role === "reporter";
   const canDeleteTickets = user?.role === "admin";
+  const canBulkImport = user?.role === "admin";
   const allTicketsSelected = tickets.length > 0 && tickets.every(ticket => selectedTickets.has(ticket.id));
   const someTicketsSelected = selectedTickets.size > 0 && !allTicketsSelected;
 
@@ -326,12 +336,31 @@ export default function TicketList() {
           )}
           
           {canCreateTicket && (
-            <Link to="/tickets/new">
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Ticket
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Ticket
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/tickets/new" className="flex items-center">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Single Ticket
+                  </Link>
+                </DropdownMenuItem>
+                {canBulkImport && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/tickets/bulk-import" className="flex items-center">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Bulk Import from Excel
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>
@@ -397,6 +426,31 @@ export default function TicketList() {
                   </AlertDialog>
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bulk Import Info */}
+      {canBulkImport && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FileSpreadsheet className="w-5 h-5 text-green-600 mr-3" />
+                <div>
+                  <p className="text-green-800 font-medium">Bulk Import Available</p>
+                  <p className="text-green-600 text-sm">
+                    Import multiple tickets from Excel files. Status is automatically set based on resolution field.
+                  </p>
+                </div>
+              </div>
+              <Link to="/tickets/bulk-import">
+                <Button variant="outline" size="sm">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import from Excel
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -654,12 +708,22 @@ export default function TicketList() {
                 }
               </p>
               {canCreateTicket && (
-                <Link to="/tickets/new">
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create First Ticket
-                  </Button>
-                </Link>
+                <div className="flex justify-center space-x-2">
+                  <Link to="/tickets/new">
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create First Ticket
+                    </Button>
+                  </Link>
+                  {canBulkImport && (
+                    <Link to="/tickets/bulk-import">
+                      <Button variant="outline">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import from Excel
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               )}
             </div>
           ) : (

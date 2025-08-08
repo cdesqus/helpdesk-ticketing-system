@@ -16,15 +16,21 @@ const auth = authHandler<AuthParams, AuthData>(
     const token = data.authorization?.replace("Bearer ", "") ?? data.session?.value;
     
     if (!token) {
+      console.log("No authentication token provided");
       throw APIError.unauthenticated("missing authentication token");
     }
 
     try {
+      console.log("Checking session for token:", token.substring(0, 8) + "...");
+      
       // Check session storage first
       const session = getSession(token);
       if (!session) {
+        console.log("Session not found or expired for token:", token.substring(0, 8) + "...");
         throw APIError.unauthenticated("invalid or expired session");
       }
+
+      console.log("Session found for user:", session.username, "role:", session.role);
 
       // Check if this is the dummy admin user
       if (session.userId === 1 && session.username === "admin") {
@@ -60,12 +66,16 @@ const auth = authHandler<AuthParams, AuthData>(
         }>`SELECT id, username, email, full_name, role, status FROM users WHERE id = ${session.userId}`;
 
         if (!user) {
+          console.log("User not found in database for session user ID:", session.userId);
           throw APIError.unauthenticated("user not found");
         }
 
         if (user.status !== "active") {
+          console.log("User account is inactive:", user.username);
           throw APIError.unauthenticated("user account is inactive");
         }
+
+        console.log("Database user authenticated:", user.username, "role:", user.role);
 
         return {
           userID: user.id.toString(),
@@ -79,6 +89,7 @@ const auth = authHandler<AuthParams, AuthData>(
         
         // If database fails but session is valid, allow dummy users
         if (session.username === "admin") {
+          console.log("Database failed, falling back to dummy admin user");
           return {
             userID: "1",
             username: "admin",
@@ -88,6 +99,7 @@ const auth = authHandler<AuthParams, AuthData>(
           };
         }
         if (session.username === "haryanto") {
+          console.log("Database failed, falling back to dummy haryanto user");
           return {
             userID: "2",
             username: "haryanto",
@@ -98,6 +110,7 @@ const auth = authHandler<AuthParams, AuthData>(
         }
         
         // For other users, if database is unavailable, we can't validate
+        console.log("Database unavailable and not a dummy user, rejecting authentication");
         throw APIError.unauthenticated("authentication service temporarily unavailable");
       }
     } catch (err) {

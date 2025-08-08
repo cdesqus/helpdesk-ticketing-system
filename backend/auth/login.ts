@@ -46,7 +46,9 @@ function cleanupExpiredSessions() {
     activeSessions.delete(token);
   }
   
-  console.log(`Cleaned up ${expiredTokens.length} expired sessions`);
+  if (expiredTokens.length > 0) {
+    console.log(`Cleaned up ${expiredTokens.length} expired sessions`);
+  }
 }
 
 // Clean up expired sessions every hour
@@ -56,6 +58,8 @@ setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
 export const login = api<LoginRequest, LoginResponseWithCookie>(
   { expose: true, method: "POST", path: "/auth/login" },
   async (req) => {
+    console.log("Login attempt for username:", req.username);
+    
     if (!req.username || !req.password) {
       throw APIError.invalidArgument("username and password are required");
     }
@@ -87,7 +91,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         lastAccessed: now,
       });
 
-      console.log(`Admin user logged in with token: ${token.substring(0, 8)}...`);
+      console.log(`Admin user logged in successfully with token: ${token.substring(0, 8)}...`);
 
       return {
         user: dummyUser,
@@ -129,7 +133,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         lastAccessed: now,
       });
 
-      console.log(`Haryanto user logged in with token: ${token.substring(0, 8)}...`);
+      console.log(`Haryanto user logged in successfully with token: ${token.substring(0, 8)}...`);
 
       return {
         user: haryantoDummyUser,
@@ -159,15 +163,18 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       }>`SELECT * FROM users WHERE username = ${req.username}`;
 
       if (!user) {
+        console.log("User not found in database:", req.username);
         throw APIError.unauthenticated("invalid username or password");
       }
 
       if (user.status !== "active") {
+        console.log("User account is inactive:", req.username);
         throw APIError.unauthenticated("account is inactive");
       }
 
       const isValidPassword = await bcrypt.compare(req.password, user.password_hash);
       if (!isValidPassword) {
+        console.log("Invalid password for user:", req.username);
         throw APIError.unauthenticated("invalid username or password");
       }
 
@@ -196,7 +203,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         updatedAt: user.updated_at,
       };
 
-      console.log(`Database user ${user.username} logged in with token: ${token.substring(0, 8)}...`);
+      console.log(`Database user ${user.username} logged in successfully with token: ${token.substring(0, 8)}...`);
 
       return {
         user: userResponse,
@@ -231,6 +238,7 @@ export function getSession(token: string) {
   const now = new Date();
   if (now > session.expiresAt) {
     activeSessions.delete(token);
+    console.log("Session expired and removed:", token.substring(0, 8) + "...");
     return null;
   }
   

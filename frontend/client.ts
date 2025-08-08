@@ -249,6 +249,7 @@ export namespace auth {
 /**
  * Import the endpoint handlers to derive the types for the client.
  */
+import { bulkDeleteTickets as api_ticket_bulk_delete_bulkDeleteTickets } from "~backend/ticket/bulk-delete";
 import { closeTicket as api_ticket_close_closeTicket } from "~backend/ticket/close";
 import {
     addComment as api_ticket_comments_addComment,
@@ -281,6 +282,7 @@ export namespace ticket {
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
             this.addComment = this.addComment.bind(this)
+            this.bulkDeleteTickets = this.bulkDeleteTickets.bind(this)
             this.closeTicket = this.closeTicket.bind(this)
             this.configureSMTP = this.configureSMTP.bind(this)
             this.create = this.create.bind(this)
@@ -312,6 +314,20 @@ export namespace ticket {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/tickets/${encodeURIComponent(params.ticketId)}/comments`, {method: "POST", body: JSON.stringify(body)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_comments_addComment>
+        }
+
+        /**
+         * Deletes multiple tickets (admin only).
+         */
+        public async bulkDeleteTickets(params: RequestType<typeof api_ticket_bulk_delete_bulkDeleteTickets>): Promise<ResponseType<typeof api_ticket_bulk_delete_bulkDeleteTickets>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                ticketIds: params.ticketIds.map((v) => String(v)),
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/tickets/bulk`, {query, method: "DELETE", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_bulk_delete_bulkDeleteTickets>
         }
 
         /**

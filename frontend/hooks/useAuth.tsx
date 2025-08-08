@@ -9,6 +9,7 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +27,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const refreshAuth = async () => {
+    const storedToken = localStorage.getItem("auth_token");
+    if (!storedToken) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Verify the token is still valid by fetching current user
+      const authenticatedBackend = backend.with({
+        auth: () => Promise.resolve({ authorization: `Bearer ${storedToken}` })
+      });
+      
+      const currentUser = await authenticatedBackend.auth.getCurrentUser();
+      setUser(currentUser);
+      setToken(storedToken);
+      console.log("Auth refreshed successfully for user:", currentUser.username);
+    } catch (error) {
+      console.error("Auth refresh failed:", error);
+      // Clear invalid session
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      setUser(null);
+      setToken(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Check for existing session on app load
     const storedToken = localStorage.getItem("auth_token");
@@ -39,14 +69,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(storedToken);
         setUser(parsedUser);
         console.log("Restored session for user:", parsedUser.username);
+        
+        // Verify the session is still valid
+        refreshAuth();
       } catch (error) {
         console.error("Failed to parse stored user data:", error);
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
+        setIsLoading(false);
       }
+    } else {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -77,7 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token) {
         console.log("Logging out user...");
         // Call logout endpoint to invalidate session on server
-        await backend.auth.logout({ token });
+        const authenticatedBackend = backend.with({
+          auth: () => Promise.resolve({ authorization: `Bearer ${token}` })
+        });
+        await authenticatedBackend.auth.logout({ token });
       }
     } catch (error) {
       console.error("Logout error:", error);
@@ -98,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     isLoading,
     isAuthenticated: !!user && !!token,
+    refreshAuth,
   };
 
   console.log("Auth context value:", { 

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import backend from "~backend/client";
+import { useBackend, useAuth } from "../hooks/useAuth";
 import type { TicketStatus, TicketPriority } from "~backend/ticket/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,13 +37,17 @@ import {
   Building,
   Mail,
   Trash2,
-  XCircle
+  XCircle,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const backend = useBackend();
+  const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [closeReason, setCloseReason] = useState("");
@@ -60,15 +64,40 @@ export default function TicketDetail() {
     customDate: "",
   });
 
-  const { data: ticket, isLoading } = useQuery({
+  const { data: ticket, isLoading, error, refetch, isError } = useQuery({
     queryKey: ["ticket", id],
-    queryFn: () => backend.ticket.get({ id: parseInt(id!) }),
-    enabled: !!id,
+    queryFn: async () => {
+      if (!id) throw new Error("No ticket ID provided");
+      
+      console.log("Fetching ticket details for ID:", id);
+      console.log("User authenticated:", isAuthenticated);
+      console.log("User details:", user);
+      
+      try {
+        const result = await backend.ticket.get({ id: parseInt(id) });
+        console.log("Ticket fetched successfully:", result);
+        return result;
+      } catch (error) {
+        console.error("Error fetching ticket:", error);
+        throw error;
+      }
+    },
+    enabled: !!id && isAuthenticated,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401/403 errors
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    staleTime: 30 * 1000, // 30 seconds
   });
 
   const { data: engineersData } = useQuery({
     queryKey: ["engineers"],
     queryFn: () => backend.ticket.listEngineers(),
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const updateMutation = useMutation({
@@ -83,11 +112,11 @@ export default function TicketDetail() {
         description: "Ticket has been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to update ticket:", error);
       toast({
         title: "Error",
-        description: "Failed to update ticket. Please try again.",
+        description: error.message || "Failed to update ticket. Please try again.",
         variant: "destructive",
       });
     },
@@ -104,11 +133,11 @@ export default function TicketDetail() {
       });
       navigate("/tickets");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to delete ticket:", error);
       toast({
         title: "Error",
-        description: "Failed to delete ticket. Please try again.",
+        description: error.message || "Failed to delete ticket. Please try again.",
         variant: "destructive",
       });
     },
@@ -129,11 +158,11 @@ export default function TicketDetail() {
         description: "Ticket has been closed successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to close ticket:", error);
       toast({
         title: "Error",
-        description: "Failed to close ticket. Please try again.",
+        description: error.message || "Failed to close ticket. Please try again.",
         variant: "destructive",
       });
     },
@@ -156,6 +185,22 @@ export default function TicketDetail() {
       });
     }
   }, [ticket]);
+
+  // Check authentication status
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please log in to view ticket details.</p>
+          <Button onClick={() => navigate("/login")}>
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -214,6 +259,11 @@ export default function TicketDetail() {
     });
   };
 
+  const handleRetry = () => {
+    console.log("Retrying ticket fetch...");
+    refetch();
+  };
+
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case "Urgent": return "destructive";
@@ -234,6 +284,52 @@ export default function TicketDetail() {
     }
   };
 
+  // Error state
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Ticket Details</h1>
+        </div>
+        
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="w-8 h-8 text-red-600 mr-4" />
+                <div>
+                  <h3 className="text-lg font-medium text-red-800">Failed to load ticket</h3>
+                  <p className="text-red-600">
+                    {error instanceof Error ? error.message : "An error occurred while loading the ticket"}
+                  </p>
+                  {(error as any)?.status === 401 && (
+                    <p className="text-sm text-red-500 mt-2">
+                      Your session may have expired. Please try logging in again.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <Button variant="outline" onClick={handleRetry}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry
+                </Button>
+                <Button onClick={() => navigate("/login")}>
+                  Login
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Loading state
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -257,6 +353,7 @@ export default function TicketDetail() {
     );
   }
 
+  // Ticket not found
   if (!ticket) {
     return (
       <div className="text-center py-12">

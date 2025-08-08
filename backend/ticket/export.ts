@@ -53,20 +53,24 @@ export const exportTickets = api<ExportTicketsRequest, ExportTicketsResponse>(
 
     if (req.startDate) {
       whereClause += ` AND created_at >= $${paramIndex}`;
-      params.push(req.startDate);
+      params.push(new Date(req.startDate));
       paramIndex++;
     }
 
     if (req.endDate) {
-      whereClause += ` AND created_at <= $${paramIndex}`;
-      params.push(req.endDate);
+      // Add one day to endDate to include the entire end date
+      const endDate = new Date(req.endDate);
+      endDate.setDate(endDate.getDate() + 1);
+      whereClause += ` AND created_at < $${paramIndex}`;
+      params.push(endDate);
       paramIndex++;
     }
 
     const query = `
       SELECT 
         id, subject, description, status, priority, assigned_engineer,
-        reporter_name, reporter_email, company_name, created_at, updated_at
+        reporter_name, reporter_email, company_name, created_at, updated_at,
+        resolved_at, custom_date
       FROM tickets ${whereClause}
       ORDER BY created_at DESC
     `;
@@ -83,6 +87,8 @@ export const exportTickets = api<ExportTicketsRequest, ExportTicketsResponse>(
       company_name: string | null;
       created_at: Date;
       updated_at: Date;
+      resolved_at: Date | null;
+      custom_date: Date | null;
     }>(query, ...params);
 
     if (req.format === "excel") {
@@ -91,30 +97,53 @@ export const exportTickets = api<ExportTicketsRequest, ExportTicketsResponse>(
       const csvData = generateCSV(rows);
       const base64Data = Buffer.from(csvData).toString('base64');
       
+      const dateRange = getDateRangeString(req.startDate, req.endDate);
+      const filename = `tickets_export_${dateRange}.csv`;
+      
       return {
         data: base64Data,
-        filename: `tickets_export_${new Date().toISOString().split('T')[0]}.csv`,
+        filename,
         contentType: "text/csv",
       };
     } else {
       // For PDF, you would use a library like puppeteer or pdfkit
       // For now, we'll return a simple text representation
-      const textData = generateTextReport(rows);
+      const textData = generateTextReport(rows, req.startDate, req.endDate);
       const base64Data = Buffer.from(textData).toString('base64');
+      
+      const dateRange = getDateRangeString(req.startDate, req.endDate);
+      const filename = `tickets_export_${dateRange}.txt`;
       
       return {
         data: base64Data,
-        filename: `tickets_export_${new Date().toISOString().split('T')[0]}.txt`,
+        filename,
         contentType: "text/plain",
       };
     }
   }
 );
 
+function getDateRangeString(startDate?: string, endDate?: string): string {
+  if (startDate && endDate) {
+    const start = new Date(startDate).toISOString().split('T')[0];
+    const end = new Date(endDate).toISOString().split('T')[0];
+    return `${start}_to_${end}`;
+  } else if (startDate) {
+    const start = new Date(startDate).toISOString().split('T')[0];
+    return `from_${start}`;
+  } else if (endDate) {
+    const end = new Date(endDate).toISOString().split('T')[0];
+    return `until_${end}`;
+  } else {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
 function generateCSV(rows: any[]): string {
   const headers = [
     "ID", "Subject", "Description", "Status", "Priority", "Assigned Engineer",
-    "Reporter Name", "Reporter Email", "Company", "Created At", "Updated At"
+    "Reporter Name", "Reporter Email", "Company", "Created At", "Updated At",
+    "Resolved At", "Custom Date"
   ];
   
   const csvRows = [headers.join(",")];
@@ -132,6 +161,8 @@ function generateCSV(rows: any[]): string {
       row.company_name || "",
       row.created_at.toISOString(),
       row.updated_at.toISOString(),
+      row.resolved_at ? row.resolved_at.toISOString() : "",
+      row.custom_date ? row.custom_date.toISOString() : "",
     ];
     csvRows.push(csvRow.join(","));
   }
@@ -139,10 +170,22 @@ function generateCSV(rows: any[]): string {
   return csvRows.join("\n");
 }
 
-function generateTextReport(rows: any[]): string {
+function generateTextReport(rows: any[], startDate?: string, endDate?: string): string {
   let report = "HELPDESK TICKETS REPORT\n";
   report += "=".repeat(50) + "\n\n";
   report += `Generated on: ${new Date().toLocaleString()}\n`;
+  
+  if (startDate || endDate) {
+    report += "Date Range: ";
+    if (startDate && endDate) {
+      report += `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}\n`;
+    } else if (startDate) {
+      report += `From ${new Date(startDate).toLocaleDateString()}\n`;
+    } else if (endDate) {
+      report += `Until ${new Date(endDate).toLocaleDateString()}\n`;
+    }
+  }
+  
   report += `Total tickets: ${rows.length}\n\n`;
   
   for (const row of rows) {
@@ -157,6 +200,12 @@ function generateTextReport(rows: any[]): string {
     report += `Company: ${row.company_name || "N/A"}\n`;
     report += `Created: ${row.created_at.toLocaleString()}\n`;
     report += `Updated: ${row.updated_at.toLocaleString()}\n`;
+    if (row.resolved_at) {
+      report += `Resolved: ${row.resolved_at.toLocaleString()}\n`;
+    }
+    if (row.custom_date) {
+      report += `Custom Date: ${row.custom_date.toLocaleString()}\n`;
+    }
     report += `Description: ${row.description}\n\n`;
   }
   

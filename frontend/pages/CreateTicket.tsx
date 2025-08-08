@@ -23,6 +23,10 @@ export default function CreateTicket() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Set default date to current date and time
+  const now = new Date();
+  const defaultDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
   const [formData, setFormData] = useState({
     subject: "",
     description: "",
@@ -32,7 +36,7 @@ export default function CreateTicket() {
     reporterName: "",
     reporterEmail: "",
     companyName: "",
-    customDate: "",
+    customDate: defaultDateTime,
   });
 
   const { data: engineersData } = useQuery({
@@ -126,6 +130,9 @@ export default function CreateTicket() {
                   value={formData.customDate}
                   onChange={(e) => setFormData({ ...formData, customDate: e.target.value })}
                 />
+                <p className="text-xs text-gray-500">
+                  Default is set to current date and time
+                </p>
               </div>
 
               <div className="space-y-2">

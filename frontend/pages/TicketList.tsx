@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -22,13 +23,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   Search, 
   Filter, 
   Download, 
   Printer, 
   Plus,
-  Eye
+  Eye,
+  Calendar
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -39,6 +50,12 @@ export default function TicketList() {
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [assignedEngineer, setAssignedEngineer] = useState("");
   const [page, setPage] = useState(0);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"excel" | "pdf">("excel");
+  const [exportDateRange, setExportDateRange] = useState({
+    startDate: "",
+    endDate: "",
+  });
   const limit = 20;
 
   const { data: ticketsData, isLoading } = useQuery({
@@ -58,14 +75,16 @@ export default function TicketList() {
     queryFn: () => backend.ticket.listEngineers(),
   });
 
-  const handleExport = async (format: "excel" | "pdf") => {
+  const handleExport = async () => {
     try {
       const response = await backend.ticket.exportTickets({
-        format,
+        format: exportFormat,
         search: search || undefined,
         status: status || undefined,
         priority: priority || undefined,
         assignedEngineer: assignedEngineer || undefined,
+        startDate: exportDateRange.startDate || undefined,
+        endDate: exportDateRange.endDate || undefined,
       });
 
       // Create download link
@@ -81,9 +100,10 @@ export default function TicketList() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
+      setIsExportDialogOpen(false);
       toast({
         title: "Export successful",
-        description: `Tickets exported as ${format.toUpperCase()}`,
+        description: `Tickets exported as ${exportFormat.toUpperCase()}`,
       });
     } catch (error) {
       console.error("Export failed:", error);
@@ -196,22 +216,86 @@ export default function TicketList() {
             </Select>
 
             <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExport("excel")}
-              >
-                <Download className="w-4 h-4 mr-1" />
-                Excel
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExport("pdf")}
-              >
-                <Download className="w-4 h-4 mr-1" />
-                PDF
-              </Button>
+              <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="w-4 h-4 mr-1" />
+                    Export
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Export Tickets</DialogTitle>
+                    <DialogDescription>
+                      Choose export format and date range for ticket export.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="exportFormat">Export Format</Label>
+                      <Select
+                        value={exportFormat}
+                        onValueChange={(value) => setExportFormat(value as "excel" | "pdf")}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="excel">Excel (CSV)</SelectItem>
+                          <SelectItem value="pdf">PDF (Text)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="startDate">Start Date</Label>
+                        <Input
+                          id="startDate"
+                          type="date"
+                          value={exportDateRange.startDate}
+                          onChange={(e) => setExportDateRange({ 
+                            ...exportDateRange, 
+                            startDate: e.target.value 
+                          })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="endDate">End Date</Label>
+                        <Input
+                          id="endDate"
+                          type="date"
+                          value={exportDateRange.endDate}
+                          onChange={(e) => setExportDateRange({ 
+                            ...exportDateRange, 
+                            endDate: e.target.value 
+                          })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                      <p className="text-sm text-blue-800">
+                        <Calendar className="w-4 h-4 inline mr-1" />
+                        Leave date fields empty to export all tickets. Current filters will be applied.
+                      </p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsExportDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleExport}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export {exportFormat.toUpperCase()}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              
               <Button
                 variant="outline"
                 size="sm"

@@ -29,7 +29,39 @@ import {
 export default function Dashboard() {
   const backend = useBackend();
 
-  const { data: statsData, isLoading, error, refetch, isError } = useQuery({
+  // Get ticket list data to calculate totals
+  const { data: ticketsData, isLoading: ticketsLoading, error: ticketsError, refetch: refetchTickets } = useQuery({
+    queryKey: ["dashboard-tickets"],
+    queryFn: async () => {
+      console.log("Fetching tickets for dashboard...");
+      try {
+        // Fetch all tickets without pagination to get accurate totals
+        const result = await backend.ticket.list({
+          limit: 1000, // Large limit to get all tickets
+          offset: 0,
+        });
+        console.log("Dashboard tickets fetched successfully:", result);
+        return result;
+      } catch (error) {
+        console.error("Error fetching dashboard tickets:", error);
+        throw error;
+      }
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: 60 * 1000, // Refresh every minute
+    refetchOnWindowFocus: true,
+    retry: (failureCount, error: any) => {
+      // Don't retry on client errors (400-499)
+      if (error?.status >= 400 && error?.status < 500) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+
+  // Get trends and engineer stats from the stats endpoint
+  const { data: statsData, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useQuery({
     queryKey: ["ticket-stats"],
     queryFn: async () => {
       console.log("Fetching dashboard stats...");
@@ -57,8 +89,13 @@ export default function Dashboard() {
 
   const handleRefresh = () => {
     console.log("Manually refreshing dashboard data...");
-    refetch();
+    refetchTickets();
+    refetchStats();
   };
+
+  const isLoading = ticketsLoading || statsLoading;
+  const isError = ticketsError || statsError;
+  const error = ticketsError || statsError;
 
   // Error state
   if (isError) {
@@ -123,20 +160,25 @@ export default function Dashboard() {
     );
   }
 
-  const stats = statsData?.stats;
+  // Calculate stats from ticket list data
+  const tickets = ticketsData?.tickets || [];
+  const totalFromList = ticketsData?.total || 0;
+  
+  // Calculate status counts from actual ticket data
+  const calculatedStats = {
+    total: totalFromList,
+    open: tickets.filter(t => t.status === "Open").length,
+    inProgress: tickets.filter(t => t.status === "In Progress").length,
+    resolved: tickets.filter(t => t.status === "Resolved").length,
+    closed: tickets.filter(t => t.status === "Closed").length,
+  };
+
+  // Use trends and engineer stats from the stats endpoint
   const trends = statsData?.trends || [];
   const engineerStats = statsData?.engineerStats || [];
 
-  // Fallback data if stats are not available
-  const fallbackStats = {
-    total: 0,
-    open: 0,
-    inProgress: 0,
-    resolved: 0,
-    closed: 0,
-  };
-
-  const currentStats = stats || fallbackStats;
+  // Use calculated stats instead of stats from endpoint
+  const currentStats = calculatedStats;
 
   const statusData = [
     { name: "Open", value: currentStats.open, color: "#ef4444" },
@@ -378,7 +420,9 @@ export default function Dashboard() {
           <CardContent className="p-4">
             <h4 className="font-medium text-blue-900 mb-2">Debug Information</h4>
             <div className="text-sm text-blue-800 space-y-1">
-              <p>Stats loaded: {stats ? 'Yes' : 'No'}</p>
+              <p>Tickets loaded: {tickets.length}</p>
+              <p>Total from list: {totalFromList}</p>
+              <p>Calculated stats: {JSON.stringify(calculatedStats)}</p>
               <p>Trends count: {trends.length}</p>
               <p>Engineer stats count: {engineerStats.length}</p>
               <p>Last fetch: {new Date().toLocaleTimeString()}</p>

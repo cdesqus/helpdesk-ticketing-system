@@ -30,8 +30,8 @@ const auth = authHandler<AuthParams, AuthData>(
     try {
       console.log("Auth handler: Checking session for token:", token.substring(0, 8) + "...");
       
-      // Check session storage first
-      const session = getSession(token);
+      // Check session storage first - AWAIT the async function
+      const session = await getSession(token);
       if (!session) {
         console.log("Auth handler: Session not found or expired for token:", token.substring(0, 8) + "...");
         throw APIError.unauthenticated("invalid or expired session");

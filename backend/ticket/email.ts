@@ -1,7 +1,7 @@
 import { secret } from "encore.dev/config";
 import { ticketDB } from "./db";
 import type { Ticket, SMTPConfig } from "./types";
-import * as nodemailer from "nodemailer";
+import nodemailer from "nodemailer";
 
 const defaultSMTPHost = secret("SMTPHost");
 const defaultSMTPPort = secret("SMTPPort");
@@ -153,6 +153,7 @@ async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, actio
     socketTimeout: transporterConfig.socketTimeout
   });
 
+  console.log(`${logPrefix} Creating nodemailer transporter...`);
   const transporter = nodemailer.createTransporter(transporterConfig);
 
   // Verify connection configuration

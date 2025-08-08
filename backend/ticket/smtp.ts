@@ -2,7 +2,7 @@ import { api, APIError } from "encore.dev/api";
 import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { SMTPConfig } from "./types";
-import * as nodemailer from "nodemailer";
+import nodemailer from "nodemailer";
 
 export interface ConfigureSMTPRequest {
   provider: string;
@@ -214,6 +214,7 @@ async function testSMTPConnection(config: ConfigureSMTPRequest): Promise<void> {
   });
 
   try {
+    console.log("Creating nodemailer transporter...");
     const transporter = nodemailer.createTransporter({
       host: config.host,
       port: config.port,
@@ -230,7 +231,7 @@ async function testSMTPConnection(config: ConfigureSMTPRequest): Promise<void> {
       socketTimeout: 30000, // 30 seconds
     });
 
-    console.log("Created nodemailer transporter, attempting to verify...");
+    console.log("Nodemailer transporter created successfully, attempting to verify...");
     await transporter.verify();
     console.log("SMTP connection test successful");
   } catch (error) {
@@ -268,6 +269,7 @@ async function sendTestEmail(config: SMTPConfig, testEmail: string): Promise<voi
   console.log("Sending test email to:", testEmail);
   
   try {
+    console.log("Creating nodemailer transporter for test email...");
     const transporter = nodemailer.createTransporter({
       host: config.host,
       port: config.port,
@@ -327,6 +329,7 @@ Test email sent at ${new Date().toLocaleString()}
       `,
     };
 
+    console.log("Sending test email with nodemailer...");
     const info = await transporter.sendMail(mailOptions);
     console.log(`Test email sent successfully to: ${testEmail}`, {
       messageId: info.messageId,

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import backend from "~backend/client";
+import { useBackend } from "../hooks/useAuth";
 import type { TicketStatus, TicketPriority } from "~backend/ticket/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { ArrowLeft, Save } from "lucide-react";
 export default function CreateTicket() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const backend = useBackend();
   const queryClient = useQueryClient();
 
   // Set default date to current date and time
@@ -55,11 +56,11 @@ export default function CreateTicket() {
       });
       navigate(`/tickets/${ticket.id}`);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to create ticket:", error);
       toast({
         title: "Error",
-        description: "Failed to create ticket. Please try again.",
+        description: error.message || "Failed to create ticket. Please try again.",
         variant: "destructive",
       });
     },
@@ -68,23 +69,28 @@ export default function CreateTicket() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.subject.trim() || !formData.description.trim() || !formData.reporterName.trim()) {
+    if (!formData.subject.trim() || !formData.description.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields.",
+        description: "Please fill in subject and description.",
         variant: "destructive",
       });
       return;
     }
 
     const submitData = {
-      ...formData,
-      assignedEngineer: formData.assignedEngineer || undefined,
-      reporterEmail: formData.reporterEmail || undefined,
-      companyName: formData.companyName || undefined,
+      subject: formData.subject.trim(),
+      description: formData.description.trim(),
+      status: formData.status,
+      priority: formData.priority,
+      assignedEngineer: formData.assignedEngineer === "unassigned" || !formData.assignedEngineer ? undefined : formData.assignedEngineer,
+      reporterName: formData.reporterName.trim() || undefined,
+      reporterEmail: formData.reporterEmail.trim() || undefined,
+      companyName: formData.companyName.trim() || undefined,
       customDate: formData.customDate ? new Date(formData.customDate) : undefined,
     };
 
+    console.log("Submitting ticket data:", submitData);
     createMutation.mutate(submitData);
   };
 
@@ -192,13 +198,12 @@ export default function CreateTicket() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reporterName">Reporter Name *</Label>
+                <Label htmlFor="reporterName">Reporter Name</Label>
                 <Input
                   id="reporterName"
                   value={formData.reporterName}
                   onChange={(e) => setFormData({ ...formData, reporterName: e.target.value })}
                   placeholder="Name of the person reporting the issue"
-                  required
                 />
               </div>
 

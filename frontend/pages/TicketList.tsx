@@ -70,6 +70,17 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
+// Helper function to convert base64 to a byte array
+const base64ToUint8Array = (base64: string) => {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+};
+
 export default function TicketList() {
   const { toast } = useToast();
   const backend = useBackend();
@@ -175,10 +186,9 @@ export default function TicketList() {
         endDate: exportDateRange.endDate || undefined,
       });
 
-      // Create download link
-      const blob = new Blob([atob(response.data)], { 
-        type: response.contentType 
-      });
+      // Create download link from base64 binary data
+      const byteArray = base64ToUint8Array(response.data);
+      const blob = new Blob([byteArray], { type: response.contentType });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -609,7 +619,7 @@ export default function TicketList() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="excel">Excel (CSV)</SelectItem>
+                          <SelectItem value="excel">Excel (.xlsx)</SelectItem>
                           <SelectItem value="pdf">PDF (Text)</SelectItem>
                         </SelectContent>
                       </Select>

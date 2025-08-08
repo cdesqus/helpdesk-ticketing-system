@@ -29,6 +29,17 @@ import {
   FileText
 } from "lucide-react";
 
+// Helper function to convert base64 to a byte array
+const base64ToUint8Array = (base64: string) => {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+};
+
 export default function BulkImport() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -76,10 +87,9 @@ export default function BulkImport() {
   const downloadTemplateMutation = useMutation({
     mutationFn: () => backend.ticket.generateImportTemplate(),
     onSuccess: (response) => {
-      // Create download link
-      const blob = new Blob([atob(response.data)], { 
-        type: response.contentType 
-      });
+      // Create download link from base64 binary data
+      const byteArray = base64ToUint8Array(response.data);
+      const blob = new Blob([byteArray], { type: response.contentType });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

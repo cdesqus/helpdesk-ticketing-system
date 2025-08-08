@@ -2,6 +2,7 @@ import { api } from "encore.dev/api";
 import { Query } from "encore.dev/api";
 import { ticketDB } from "./db";
 import type { TicketStatus, TicketPriority } from "./types";
+import * as XLSX from 'xlsx';
 
 export interface ExportTicketsRequest {
   format: Query<"excel" | "pdf">;
@@ -93,18 +94,16 @@ export const exportTickets = api<ExportTicketsRequest, ExportTicketsResponse>(
     }>(query, ...params);
 
     if (req.format === "excel") {
-      // In a real implementation, you would use a library like xlsx to generate Excel files
-      // For now, we'll return CSV data as a placeholder
-      const csvData = generateCSV(rows);
-      const base64Data = Buffer.from(csvData).toString('base64');
+      const xlsxBuffer = generateXLSXExport(rows);
+      const base64Data = xlsxBuffer.toString('base64');
       
       const dateRange = getDateRangeString(req.startDate, req.endDate);
-      const filename = `tickets_export_${dateRange}.csv`;
+      const filename = `tickets_export_${dateRange}.xlsx`;
       
       return {
         data: base64Data,
         filename,
-        contentType: "text/csv",
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       };
     } else {
       // For PDF, you would use a library like puppeteer or pdfkit
@@ -140,36 +139,54 @@ function getDateRangeString(startDate?: string, endDate?: string): string {
   }
 }
 
-function generateCSV(rows: any[]): string {
+function generateXLSXExport(rows: any[]): Buffer {
   const headers = [
     "ID", "Subject", "Description", "Status", "Priority", "Assigned Engineer",
     "Reporter Name", "Reporter Email", "Company", "Resolution", "Created At", "Updated At",
     "Resolved At", "Custom Date"
   ];
   
-  const csvRows = [headers.join(",")];
+  const data = rows.map(row => [
+    row.id,
+    row.subject,
+    row.description,
+    row.status,
+    row.priority,
+    row.assigned_engineer || "",
+    row.reporter_name,
+    row.reporter_email || "",
+    row.company_name || "",
+    row.resolution || "",
+    row.created_at,
+    row.updated_at,
+    row.resolved_at || "",
+    row.custom_date || ""
+  ]);
+
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
   
-  for (const row of rows) {
-    const csvRow = [
-      row.id,
-      `"${row.subject.replace(/"/g, '""')}"`,
-      `"${row.description.replace(/"/g, '""')}"`,
-      row.status,
-      row.priority,
-      row.assigned_engineer || "",
-      `"${row.reporter_name.replace(/"/g, '""')}"`,
-      row.reporter_email || "",
-      row.company_name || "",
-      row.resolution ? `"${row.resolution.replace(/"/g, '""')}"` : "",
-      row.created_at.toISOString(),
-      row.updated_at.toISOString(),
-      row.resolved_at ? row.resolved_at.toISOString() : "",
-      row.custom_date ? row.custom_date.toISOString() : "",
-    ];
-    csvRows.push(csvRow.join(","));
-  }
-  
-  return csvRows.join("\n");
+  // Set column widths
+  worksheet['!cols'] = [
+    { wch: 10 }, // ID
+    { wch: 40 }, // Subject
+    { wch: 60 }, // Description
+    { wch: 15 }, // Status
+    { wch: 15 }, // Priority
+    { wch: 25 }, // Assigned Engineer
+    { wch: 25 }, // Reporter Name
+    { wch: 30 }, // Reporter Email
+    { wch: 20 }, // Company
+    { wch: 60 }, // Resolution
+    { wch: 20 }, // Created At
+    { wch: 20 }, // Updated At
+    { wch: 20 }, // Resolved At
+    { wch: 20 }, // Custom Date
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets Export");
+
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 }
 
 function generateTextReport(rows: any[], startDate?: string, endDate?: string): string {

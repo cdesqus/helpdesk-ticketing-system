@@ -62,3 +62,14 @@ export interface SMTPConfig {
   password: string;
   fromEmail: string;
 }
+
+export interface SystemConfig {
+  id: number;
+  systemName: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+  primaryColor: string;
+  secondaryColor: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

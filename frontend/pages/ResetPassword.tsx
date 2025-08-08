@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { HelpCircle, ArrowLeft, Eye, EyeOff, CheckCircle } from "lucide-react";
+import SystemLogo from "../components/SystemLogo";
+import { ArrowLeft, Eye, EyeOff, CheckCircle } from "lucide-react";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -80,11 +81,8 @@ export default function ResetPassword() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Login
           </Link>
-          <div className="flex items-center justify-center mb-4">
-            <HelpCircle className="w-10 h-10 text-blue-600" />
-            <span className="ml-2 text-2xl font-bold text-gray-900">
-              IDESOLUSI Helpdesk
-            </span>
+          <div className="flex justify-center mb-4">
+            <SystemLogo size="lg" />
           </div>
           <h1 className="text-xl font-semibold text-gray-900">
             Reset your password

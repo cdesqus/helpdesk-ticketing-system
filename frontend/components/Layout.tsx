@@ -3,12 +3,12 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import SystemLogo from "./SystemLogo";
 import { 
   LayoutDashboard, 
   Ticket, 
   Plus, 
   Settings,
-  HelpCircle,
   Users,
   LogOut
 } from "lucide-react";
@@ -56,10 +56,7 @@ export default function Layout({ children }: LayoutProps) {
         <div className="hidden md:flex md:w-64 md:flex-col">
           <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-white border-r border-gray-200">
             <div className="flex items-center flex-shrink-0 px-4">
-              <HelpCircle className="w-8 h-8 text-blue-600" />
-              <span className="ml-2 text-xl font-semibold text-gray-900">
-                Helpdesk
-              </span>
+              <SystemLogo />
             </div>
             
             {/* User Info */}

@@ -2,8 +2,8 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import SystemLogo from "../components/SystemLogo";
 import { 
-  HelpCircle, 
   Ticket, 
   Users, 
   MessageSquare, 
@@ -51,12 +51,7 @@ export default function Landing() {
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <HelpCircle className="w-8 h-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">
-                IDESOLUSI Helpdesk
-              </span>
-            </div>
+            <SystemLogo />
             <Link to="/login">
               <Button>
                 Login
@@ -129,7 +124,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl font-bold text-gray-900 mb-6">
-                Why Choose IDESOLUSI Helpdesk?
+                Why Choose Our Helpdesk System?
               </h2>
               <p className="text-lg text-gray-600 mb-8">
                 Our helpdesk system is designed to improve efficiency, enhance communication, 
@@ -146,7 +141,9 @@ export default function Landing() {
             </div>
             <div className="bg-white rounded-lg shadow-xl p-8">
               <div className="text-center">
-                <HelpCircle className="w-16 h-16 text-blue-600 mx-auto mb-6" />
+                <div className="flex justify-center mb-6">
+                  <SystemLogo size="lg" />
+                </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-4">
                   Ready to Get Started?
                 </h3>
@@ -171,8 +168,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex items-center justify-center mb-4">
-              <HelpCircle className="w-8 h-8 text-blue-400" />
-              <span className="ml-2 text-xl font-bold">IDESOLUSI Helpdesk</span>
+              <SystemLogo />
             </div>
             <p className="text-gray-400 mb-4">
               Professional helpdesk management system for modern support teams.

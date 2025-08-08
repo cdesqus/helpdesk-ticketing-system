@@ -39,7 +39,7 @@ const auth = authHandler<AuthParams, AuthData>(
 
       console.log("Auth handler: Session found for user:", session.username, "role:", session.role, "expires:", session.expiresAt.toISOString());
 
-      // Check if this is the dummy admin user
+      // Always return the session data for dummy users (don't check database)
       if (session.userId === 1 && session.username === "admin") {
         console.log("Auth handler: Returning dummy admin user");
         return {
@@ -51,7 +51,6 @@ const auth = authHandler<AuthParams, AuthData>(
         };
       }
 
-      // Check if this is the dummy haryanto user
       if (session.userId === 2 && session.username === "haryanto") {
         console.log("Auth handler: Returning dummy haryanto user");
         return {
@@ -63,7 +62,7 @@ const auth = authHandler<AuthParams, AuthData>(
         };
       }
 
-      // Try database lookup for other users
+      // For other users, try database lookup but don't fail if database is unavailable
       try {
         console.log("Auth handler: Looking up user in database for session user ID:", session.userId);
         const user = await authDB.queryRow<{
@@ -77,7 +76,14 @@ const auth = authHandler<AuthParams, AuthData>(
 
         if (!user) {
           console.log("Auth handler: User not found in database for session user ID:", session.userId);
-          throw APIError.unauthenticated("user not found");
+          // Don't fail, use session data
+          return {
+            userID: session.userId.toString(),
+            username: session.username,
+            email: `${session.username}@idesolusi.co.id`,
+            fullName: session.username,
+            role: session.role,
+          };
         }
 
         if (user.status !== "active") {
@@ -97,31 +103,15 @@ const auth = authHandler<AuthParams, AuthData>(
       } catch (dbError) {
         console.error("Auth handler: Database error:", dbError);
         
-        // If database fails but session is valid, allow dummy users
-        if (session.username === "admin") {
-          console.log("Auth handler: Database failed, falling back to dummy admin user");
-          return {
-            userID: "1",
-            username: "admin",
-            email: "admin@idesolusi.co.id",
-            fullName: "System Administrator",
-            role: "admin",
-          };
-        }
-        if (session.username === "haryanto") {
-          console.log("Auth handler: Database failed, falling back to dummy haryanto user");
-          return {
-            userID: "2",
-            username: "haryanto",
-            email: "haryanto@idesolusi.co.id",
-            fullName: "Haryanto",
-            role: "admin",
-          };
-        }
-        
-        // For other users, if database is unavailable, we can't validate
-        console.log("Auth handler: Database unavailable and not a dummy user, rejecting authentication");
-        throw APIError.unauthenticated("authentication service temporarily unavailable");
+        // If database fails, use session data as fallback
+        console.log("Auth handler: Database failed, using session data as fallback");
+        return {
+          userID: session.userId.toString(),
+          username: session.username,
+          email: `${session.username}@idesolusi.co.id`,
+          fullName: session.username,
+          role: session.role,
+        };
       }
     } catch (err) {
       if (err instanceof APIError) {

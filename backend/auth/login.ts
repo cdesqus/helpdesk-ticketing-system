@@ -31,13 +31,15 @@ function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// Clean up expired sessions periodically
+// Clean up expired sessions periodically (but don't be too aggressive)
 function cleanupExpiredSessions() {
   const now = new Date();
   const expiredTokens: string[] = [];
   
   for (const [token, session] of activeSessions.entries()) {
-    if (now > session.expiresAt) {
+    // Only remove sessions that are significantly expired (add 1 hour buffer)
+    const bufferTime = new Date(session.expiresAt.getTime() + 60 * 60 * 1000);
+    if (now > bufferTime) {
       expiredTokens.push(token);
     }
   }
@@ -51,8 +53,8 @@ function cleanupExpiredSessions() {
   }
 }
 
-// Clean up expired sessions every hour
-setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+// Clean up expired sessions every 2 hours (less frequent)
+setInterval(cleanupExpiredSessions, 2 * 60 * 60 * 1000);
 
 // Authenticates a user with username and password.
 export const login = api<LoginRequest, LoginResponseWithCookie>(
@@ -79,9 +81,9 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+      const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
       
-      // Store session with 24-hour expiration
+      // Store session with 48-hour expiration
       activeSessions.set(token, {
         userId: dummyUser.id,
         username: dummyUser.username,
@@ -98,7 +100,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 24 hours
+          expires: expiresAt, // Set cookie expiration to 48 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -121,9 +123,9 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+      const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
       
-      // Store session with 24-hour expiration
+      // Store session with 48-hour expiration
       activeSessions.set(token, {
         userId: haryantoDummyUser.id,
         username: haryantoDummyUser.username,
@@ -140,7 +142,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 24 hours
+          expires: expiresAt, // Set cookie expiration to 48 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -180,9 +182,9 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+      const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
       
-      // Store session with 24-hour expiration
+      // Store session with 48-hour expiration
       activeSessions.set(token, {
         userId: user.id,
         username: user.username,
@@ -210,7 +212,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 24 hours
+          expires: expiresAt, // Set cookie expiration to 48 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -233,23 +235,33 @@ export function getSession(token: string) {
   const session = activeSessions.get(token);
   if (!session) {
     console.log("getSession: Session not found for token:", token.substring(0, 8) + "...");
+    console.log("getSession: Active sessions count:", activeSessions.size);
     return null;
   }
   
-  // Check if session has expired
   const now = new Date();
+  
+  // Check if session has expired (with some tolerance)
   if (now > session.expiresAt) {
     activeSessions.delete(token);
     console.log("getSession: Session expired and removed:", token.substring(0, 8) + "...", "expired at:", session.expiresAt.toISOString(), "current time:", now.toISOString());
     return null;
   }
   
-  // Update last accessed time and extend session by another 24 hours on each access
-  const newExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  session.lastAccessed = now;
-  session.expiresAt = newExpiresAt;
+  // Update last accessed time but don't extend expiration automatically
+  // Only extend if session is more than halfway to expiration
+  const halfwayPoint = new Date(session.createdAt.getTime() + (session.expiresAt.getTime() - session.createdAt.getTime()) / 2);
   
-  console.log("getSession: Valid session found for token:", token.substring(0, 8) + "...", "extended expires at:", session.expiresAt.toISOString());
+  if (now > halfwayPoint) {
+    // Extend session by another 48 hours
+    const newExpiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    session.expiresAt = newExpiresAt;
+    console.log("getSession: Session extended for token:", token.substring(0, 8) + "...", "new expires at:", session.expiresAt.toISOString());
+  }
+  
+  session.lastAccessed = now;
+  
+  console.log("getSession: Valid session found for token:", token.substring(0, 8) + "...", "expires at:", session.expiresAt.toISOString());
   return session;
 }
 
@@ -306,8 +318,8 @@ export const refreshSession = api<void, { message: string; expiresAt: Date }>(
       throw APIError.unauthenticated("session has expired");
     }
 
-    // Extend session by another 24 hours
-    const newExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    // Extend session by another 48 hours
+    const newExpiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
     session.expiresAt = newExpiresAt;
     session.lastAccessed = now;
 

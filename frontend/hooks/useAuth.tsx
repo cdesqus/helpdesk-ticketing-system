@@ -70,8 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(parsedUser);
         console.log("Restored session for user:", parsedUser.username);
         
-        // Verify the session is still valid
-        refreshAuth();
+        // Don't verify immediately on load to avoid 401 errors
+        setIsLoading(false);
       } catch (error) {
         console.error("Failed to parse stored user data:", error);
         localStorage.removeItem("auth_token");

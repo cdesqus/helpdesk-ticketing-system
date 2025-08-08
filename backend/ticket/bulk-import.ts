@@ -249,6 +249,7 @@ function generateXLSXTemplateBuffer(): Buffer {
   
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
   
+  // Set column widths for better readability
   worksheet['!cols'] = [
     { wch: 30 }, // subject
     { wch: 50 }, // description
@@ -264,5 +265,6 @@ function generateXLSXTemplateBuffer(): Buffer {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
 
+  // Generate buffer
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 }

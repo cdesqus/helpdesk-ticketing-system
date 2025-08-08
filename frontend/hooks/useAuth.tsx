@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsedUser = JSON.parse(storedUser);
         setToken(storedToken);
         setUser(parsedUser);
+        console.log("Restored session for user:", parsedUser.username);
       } catch (error) {
         console.error("Failed to parse stored user data:", error);
         localStorage.removeItem("auth_token");
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     try {
+      console.log("Attempting login for user:", username);
       const response = await backend.auth.login({ username, password });
       
       setUser(response.user);
@@ -55,7 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       localStorage.setItem("auth_token", response.token);
       localStorage.setItem("auth_user", JSON.stringify(response.user));
+      
+      console.log("Login successful for user:", response.user.username);
     } catch (error) {
+      console.error("Login failed:", error);
       throw error;
     }
   };
@@ -63,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       if (token) {
+        console.log("Logging out user...");
         // Call logout endpoint to invalidate session on server
         await backend.auth.logout({ token });
       }
@@ -70,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Logout error:", error);
     } finally {
       // Clear local state regardless of server response
+      console.log("Clearing local session data");
       setUser(null);
       setToken(null);
       localStorage.removeItem("auth_token");
@@ -102,6 +109,9 @@ export function useBackend() {
   }
   
   return backend.with({
-    auth: () => Promise.resolve({ authorization: `Bearer ${token}` })
+    auth: () => {
+      console.log("Using auth token:", token.substring(0, 8) + "...");
+      return Promise.resolve({ authorization: `Bearer ${token}` });
+    }
   });
 }

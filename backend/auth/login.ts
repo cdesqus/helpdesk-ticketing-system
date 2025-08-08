@@ -23,6 +23,7 @@ const activeSessions = new Map<string, {
   role: UserRole; 
   createdAt: Date;
   expiresAt: Date;
+  lastAccessed: Date;
 }>();
 
 // Generate a simple session token
@@ -30,10 +31,35 @@ function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// Clean up expired sessions periodically
+function cleanupExpiredSessions() {
+  const now = new Date();
+  const expiredTokens: string[] = [];
+  
+  for (const [token, session] of activeSessions.entries()) {
+    if (now > session.expiresAt) {
+      expiredTokens.push(token);
+    }
+  }
+  
+  for (const token of expiredTokens) {
+    activeSessions.delete(token);
+  }
+  
+  console.log(`Cleaned up ${expiredTokens.length} expired sessions`);
+}
+
+// Clean up expired sessions every hour
+setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+
 // Authenticates a user with username and password.
 export const login = api<LoginRequest, LoginResponseWithCookie>(
   { expose: true, method: "POST", path: "/auth/login" },
   async (req) => {
+    if (!req.username || !req.password) {
+      throw APIError.invalidArgument("username and password are required");
+    }
+
     // Temporary dummy admin login
     if (req.username === "admin" && req.password === "admin123") {
       const dummyUser: User = {
@@ -49,15 +75,19 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const now = new Date();
       
       // Store session
       activeSessions.set(token, {
         userId: dummyUser.id,
         username: dummyUser.username,
         role: dummyUser.role,
-        createdAt: new Date(),
+        createdAt: now,
         expiresAt: expiresAt,
+        lastAccessed: now,
       });
+
+      console.log(`Admin user logged in with token: ${token.substring(0, 8)}...`);
 
       return {
         user: dummyUser,
@@ -87,15 +117,19 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const now = new Date();
       
       // Store session
       activeSessions.set(token, {
         userId: haryantoDummyUser.id,
         username: haryantoDummyUser.username,
         role: haryantoDummyUser.role,
-        createdAt: new Date(),
+        createdAt: now,
         expiresAt: expiresAt,
+        lastAccessed: now,
       });
+
+      console.log(`Haryanto user logged in with token: ${token.substring(0, 8)}...`);
 
       return {
         user: haryantoDummyUser,
@@ -139,14 +173,16 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const now = new Date();
       
       // Store session
       activeSessions.set(token, {
         userId: user.id,
         username: user.username,
         role: user.role,
-        createdAt: new Date(),
+        createdAt: now,
         expiresAt: expiresAt,
+        lastAccessed: now,
       });
 
       const userResponse: User = {
@@ -160,6 +196,8 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         updatedAt: user.updated_at,
       };
 
+      console.log(`Database user ${user.username} logged in with token: ${token.substring(0, 8)}...`);
+
       return {
         user: userResponse,
         token,
@@ -172,8 +210,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         },
       };
     } catch (dbError) {
-      // If database fails, still allow dummy admin login
-      console.log("Database authentication failed, using dummy admin only");
+      console.error("Database authentication failed:", dbError);
       throw APIError.unauthenticated("invalid username or password");
     }
   }
@@ -181,39 +218,51 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
 // Export session management functions for use in auth handler
 export function getSession(token: string) {
+  if (!token) {
+    return null;
+  }
+
   const session = activeSessions.get(token);
   if (!session) {
     return null;
   }
   
   // Check if session has expired
-  if (new Date() > session.expiresAt) {
+  const now = new Date();
+  if (now > session.expiresAt) {
     activeSessions.delete(token);
     return null;
   }
+  
+  // Update last accessed time
+  session.lastAccessed = now;
   
   return session;
 }
 
 export function removeSession(token: string) {
-  activeSessions.delete(token);
-}
-
-// Clean up expired sessions (run periodically)
-export function cleanupExpiredSessions() {
-  const now = new Date();
-  const expiredTokens: string[] = [];
-  
-  for (const [token, session] of activeSessions.entries()) {
-    if (now > session.expiresAt) {
-      expiredTokens.push(token);
-    }
-  }
-  
-  for (const token of expiredTokens) {
-    activeSessions.delete(token);
+  if (token) {
+    const deleted = activeSessions.delete(token);
+    console.log(`Session removed: ${token.substring(0, 8)}... (existed: ${deleted})`);
   }
 }
 
-// Clean up expired sessions every hour
-setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+export function getAllActiveSessions() {
+  return Array.from(activeSessions.entries()).map(([token, session]) => ({
+    token: token.substring(0, 8) + "...",
+    userId: session.userId,
+    username: session.username,
+    role: session.role,
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
+    lastAccessed: session.lastAccessed,
+  }));
+}
+
+// Debug endpoint to check active sessions (admin only)
+export const getActiveSessions = api<void, { sessions: any[] }>(
+  { auth: true, expose: true, method: "GET", path: "/auth/sessions" },
+  async () => {
+    return { sessions: getAllActiveSessions() };
+  }
+);

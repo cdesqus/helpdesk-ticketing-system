@@ -3,7 +3,7 @@ import { Query } from "encore.dev/api";
 import { ticketDB } from "./db";
 import type { TicketStatus, TicketPriority } from "./types";
 import * as XLSX from 'xlsx';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 
 export interface ExportTicketsRequest {
   format: Query<"excel" | "pdf">;

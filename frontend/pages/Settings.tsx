@@ -91,17 +91,16 @@ export default function Settings() {
     mutationFn: (data: any) => backend.ticket.configureSMTP(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["smtp-config"] });
-      queryClient.invalidateQueries({ queryKey: ["email-stats"] });
       toast({
-        title: "SMTP configured",
-        description: "Email settings have been saved and tested successfully.",
+        title: "SMTP configuration saved",
+        description: "Your email settings have been saved. You can now send a test email.",
       });
     },
     onError: (error: any) => {
-      console.error("Failed to configure SMTP:", error);
+      console.error("Failed to save SMTP configuration:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save email settings. Please check your configuration.",
+        description: error.message || "Failed to save email settings. Please try again.",
         variant: "destructive",
       });
     },
@@ -576,7 +575,7 @@ export default function Settings() {
                       <li>• For Office 365: Use your full email address as username</li>
                       <li>• Emails will be sent from: {smtpConfig.fromEmail}</li>
                       <li>• Email notifications are sent when tickets are created or updated</li>
-                      <li>• Configuration will be tested automatically when saved</li>
+                      <li>• After saving, use the 'Test Email Configuration' section to verify your settings</li>
                     </ul>
                   </div>
 
@@ -586,7 +585,7 @@ export default function Settings() {
                       disabled={configureSMTPMutation.isPending}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {configureSMTPMutation.isPending ? "Saving & Testing..." : "Save & Test Configuration"}
+                      {configureSMTPMutation.isPending ? "Saving..." : "Save Configuration"}
                     </Button>
                   </div>
                 </CardContent>

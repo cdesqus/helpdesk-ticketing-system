@@ -31,7 +31,7 @@ export const configureSMTP = api<ConfigureSMTPRequest, SMTPConfig>(
       throw APIError.permissionDenied("only admins can configure SMTP settings");
     }
 
-    console.log("Configuring SMTP with data:", {
+    console.log("Saving SMTP configuration with data:", {
       provider: req.provider,
       host: req.host,
       port: req.port,
@@ -41,11 +41,6 @@ export const configureSMTP = api<ConfigureSMTPRequest, SMTPConfig>(
     });
 
     try {
-      // Test the SMTP configuration before saving
-      console.log("Testing SMTP connection before saving...");
-      await testSMTPConnection(req);
-      console.log("SMTP connection test successful");
-
       // Delete existing configuration
       console.log("Deleting existing SMTP configuration...");
       await ticketDB.exec`DELETE FROM smtp_config`;
@@ -90,25 +85,13 @@ export const configureSMTP = api<ConfigureSMTPRequest, SMTPConfig>(
         fromEmail: row.from_email,
       };
     } catch (error) {
-      console.error("Failed to configure SMTP:", error);
+      console.error("Failed to save SMTP configuration:", error);
       
-      // Provide more specific error messages
-      if (error instanceof Error) {
-        if (error.message.includes("SMTP connection test failed")) {
-          throw APIError.invalidArgument(`SMTP configuration test failed: ${error.message}`);
-        }
-        if (error.message.includes("database")) {
-          throw APIError.internal(`Database error: ${error.message}`);
-        }
-        if (error.message.includes("timeout")) {
-          throw APIError.invalidArgument("SMTP server connection timeout. Please check your host and port settings.");
-        }
-        if (error.message.includes("authentication")) {
-          throw APIError.invalidArgument("SMTP authentication failed. Please check your username and password.");
-        }
+      if (error instanceof Error && error.message.includes("database")) {
+        throw APIError.internal(`Database error: ${error.message}`);
       }
       
-      throw APIError.internal(`Failed to configure SMTP settings: ${error instanceof Error ? error.message : String(error)}`);
+      throw APIError.internal(`Failed to save SMTP settings: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 );
@@ -202,66 +185,6 @@ async function getSMTPConfigFromDB(): Promise<SMTPConfig | null> {
   } catch (error) {
     console.error("Failed to get SMTP config from database:", error);
     return null;
-  }
-}
-
-async function testSMTPConnection(config: ConfigureSMTPRequest): Promise<void> {
-  console.log("Testing SMTP connection with config:", {
-    host: config.host,
-    port: config.port,
-    username: config.username,
-    hasPassword: !!config.password
-  });
-
-  try {
-    console.log("Creating nodemailer transporter...");
-    const transporter = nodemailer.createTransporter({
-      host: config.host,
-      port: config.port,
-      secure: config.port === 465, // true for 465, false for other ports
-      auth: {
-        user: config.username,
-        pass: config.password,
-      },
-      tls: {
-        rejectUnauthorized: false, // Allow self-signed certificates for development
-      },
-      connectionTimeout: 30000, // 30 seconds
-      greetingTimeout: 15000, // 15 seconds
-      socketTimeout: 30000, // 30 seconds
-    });
-
-    console.log("Nodemailer transporter created successfully, attempting to verify...");
-    await transporter.verify();
-    console.log("SMTP connection test successful");
-  } catch (error) {
-    console.error("SMTP connection test failed:", {
-      error: error instanceof Error ? error.message : String(error),
-      code: (error as any)?.code,
-      command: (error as any)?.command,
-      response: (error as any)?.response,
-      responseCode: (error as any)?.responseCode
-    });
-    
-    // Provide more helpful error messages
-    let errorMessage = "SMTP connection test failed";
-    if (error instanceof Error) {
-      if (error.message.includes("ENOTFOUND")) {
-        errorMessage = "SMTP server not found. Please check the host address.";
-      } else if (error.message.includes("ECONNREFUSED")) {
-        errorMessage = "Connection refused. Please check the host and port.";
-      } else if (error.message.includes("ETIMEDOUT")) {
-        errorMessage = "Connection timeout. Please check your network and firewall settings.";
-      } else if (error.message.includes("Invalid login")) {
-        errorMessage = "Authentication failed. Please check your username and password.";
-      } else if (error.message.includes("535")) {
-        errorMessage = "Authentication failed. For Gmail, use an App Password instead of your regular password.";
-      } else {
-        errorMessage = `SMTP connection test failed: ${error.message}`;
-      }
-    }
-    
-    throw new Error(errorMessage);
   }
 }
 

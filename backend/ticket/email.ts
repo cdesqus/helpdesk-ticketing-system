@@ -9,15 +9,25 @@ const defaultSMTPUser = secret("SMTPUser");
 const defaultSMTPPass = secret("SMTPPass");
 
 export async function sendTicketNotification(ticket: Ticket, action: "created" | "updated") {
+  const startTime = Date.now();
+  const logPrefix = `[EMAIL-${ticket.id}]`;
+  
+  console.log(`${logPrefix} Starting email notification process for ticket #${ticket.id} (${action})`);
+  
   if (!ticket.reporterEmail) {
-    console.log("No reporter email provided, skipping notification");
-    return;
+    console.log(`${logPrefix} No reporter email provided, skipping notification`);
+    return { success: false, reason: "No reporter email provided" };
   }
 
+  console.log(`${logPrefix} Reporter email: ${ticket.reporterEmail}`);
+
   try {
+    // Get SMTP configuration
+    console.log(`${logPrefix} Fetching SMTP configuration...`);
     const config = await getSMTPConfig();
+    
     if (!config) {
-      console.log("No SMTP configuration found, trying environment variables");
+      console.log(`${logPrefix} No SMTP configuration found in database, trying environment variables`);
       
       // Try to use environment variables as fallback
       const envHost = defaultSMTPHost();
@@ -25,42 +35,99 @@ export async function sendTicketNotification(ticket: Ticket, action: "created" |
       const envUser = defaultSMTPUser();
       const envPass = defaultSMTPPass();
       
+      console.log(`${logPrefix} Environment variables check:`, {
+        hasHost: !!envHost,
+        hasPort: !!envPort,
+        hasUser: !!envUser,
+        hasPass: !!envPass,
+        host: envHost || 'NOT_SET',
+        port: envPort || 'NOT_SET',
+        user: envUser || 'NOT_SET'
+      });
+      
       if (!envHost || !envUser || !envPass) {
-        console.log("No SMTP configuration available, email notification skipped");
-        return;
+        const missingVars = [];
+        if (!envHost) missingVars.push('SMTP_HOST');
+        if (!envUser) missingVars.push('SMTP_USER');
+        if (!envPass) missingVars.push('SMTP_PASS');
+        
+        console.error(`${logPrefix} Missing environment variables: ${missingVars.join(', ')}`);
+        console.log(`${logPrefix} Email notification skipped - no SMTP configuration available`);
+        return { success: false, reason: `Missing SMTP configuration: ${missingVars.join(', ')}` };
       }
       
       // Use environment variables
-      await sendEmailWithNodemailer({
+      const envConfig = {
         host: envHost,
         port: parseInt(envPort || "587"),
         username: envUser,
         password: envPass,
         fromEmail: envUser,
-      }, ticket, action);
+      };
       
-      return;
+      console.log(`${logPrefix} Using environment variables for SMTP:`, {
+        host: envConfig.host,
+        port: envConfig.port,
+        username: envConfig.username,
+        fromEmail: envConfig.fromEmail
+      });
+      
+      const result = await sendEmailWithNodemailer(envConfig, ticket, action, logPrefix);
+      const duration = Date.now() - startTime;
+      console.log(`${logPrefix} Email notification completed in ${duration}ms`);
+      return result;
     }
 
-    await sendEmailWithNodemailer(config, ticket, action);
-    console.log(`Email notification sent successfully to: ${ticket.reporterEmail}`);
+    console.log(`${logPrefix} Using database SMTP configuration:`, {
+      provider: config.provider,
+      host: config.host,
+      port: config.port,
+      username: config.username,
+      fromEmail: config.fromEmail
+    });
+
+    const result = await sendEmailWithNodemailer(config, ticket, action, logPrefix);
+    const duration = Date.now() - startTime;
+    console.log(`${logPrefix} Email notification completed in ${duration}ms`);
+    return result;
 
   } catch (error) {
-    console.error("Failed to send email notification:", error);
-    throw error;
+    const duration = Date.now() - startTime;
+    console.error(`${logPrefix} Email notification failed after ${duration}ms:`, {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      ticketId: ticket.id,
+      reporterEmail: ticket.reporterEmail,
+      action
+    });
+    
+    return { 
+      success: false, 
+      reason: error instanceof Error ? error.message : String(error),
+      duration 
+    };
   }
 }
 
-async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, action: "created" | "updated") {
+async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, action: "created" | "updated", logPrefix: string) {
   const subject = action === "created" 
     ? `New Ticket Created: ${ticket.subject} (#${ticket.id})`
     : `Ticket Updated: ${ticket.subject} (#${ticket.id})`;
 
+  console.log(`${logPrefix} Preparing email:`, {
+    to: ticket.reporterEmail,
+    subject: subject,
+    action: action
+  });
+
   const htmlBody = generateHTMLEmailBody(ticket, action);
   const textBody = generateTextEmailBody(ticket, action);
 
+  console.log(`${logPrefix} Email content generated - HTML: ${htmlBody.length} chars, Text: ${textBody.length} chars`);
+
   // Create transporter
-  const transporter = nodemailer.createTransporter({
+  console.log(`${logPrefix} Creating SMTP transporter...`);
+  const transporterConfig = {
     host: config.host,
     port: config.port,
     secure: config.port === 465, // true for 465, false for other ports
@@ -71,18 +138,42 @@ async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, actio
     tls: {
       rejectUnauthorized: false, // Allow self-signed certificates for development
     },
+    connectionTimeout: 60000, // 60 seconds
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 60000, // 60 seconds
+  };
+
+  console.log(`${logPrefix} Transporter config:`, {
+    host: transporterConfig.host,
+    port: transporterConfig.port,
+    secure: transporterConfig.secure,
+    username: transporterConfig.auth.user,
+    connectionTimeout: transporterConfig.connectionTimeout,
+    greetingTimeout: transporterConfig.greetingTimeout,
+    socketTimeout: transporterConfig.socketTimeout
   });
 
+  const transporter = nodemailer.createTransporter(transporterConfig);
+
   // Verify connection configuration
+  console.log(`${logPrefix} Verifying SMTP connection...`);
   try {
+    const verifyStart = Date.now();
     await transporter.verify();
-    console.log("SMTP server connection verified successfully");
+    const verifyDuration = Date.now() - verifyStart;
+    console.log(`${logPrefix} SMTP server connection verified successfully in ${verifyDuration}ms`);
   } catch (error) {
-    console.error("SMTP server connection failed:", error);
-    throw new Error("SMTP server connection failed");
+    console.error(`${logPrefix} SMTP server connection verification failed:`, {
+      error: error instanceof Error ? error.message : String(error),
+      code: (error as any)?.code,
+      command: (error as any)?.command,
+      response: (error as any)?.response,
+      responseCode: (error as any)?.responseCode
+    });
+    throw new Error(`SMTP connection failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  // Send mail
+  // Prepare mail options
   const mailOptions = {
     from: `"IDESOLUSI Helpdesk" <${config.fromEmail}>`,
     to: ticket.reporterEmail,
@@ -91,10 +182,72 @@ async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, actio
     html: htmlBody,
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  console.log("Email sent successfully:", info.messageId);
-  
-  return info;
+  console.log(`${logPrefix} Mail options prepared:`, {
+    from: mailOptions.from,
+    to: mailOptions.to,
+    subject: mailOptions.subject,
+    hasText: !!mailOptions.text,
+    hasHtml: !!mailOptions.html
+  });
+
+  // Send mail
+  console.log(`${logPrefix} Sending email...`);
+  try {
+    const sendStart = Date.now();
+    const info = await transporter.sendMail(mailOptions);
+    const sendDuration = Date.now() - sendStart;
+    
+    console.log(`${logPrefix} Email sent successfully in ${sendDuration}ms:`, {
+      messageId: info.messageId,
+      response: info.response,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      pending: info.pending,
+      envelope: info.envelope
+    });
+    
+    // Log successful delivery
+    await logEmailDelivery(ticket.id, ticket.reporterEmail!, action, 'success', {
+      messageId: info.messageId,
+      response: info.response,
+      duration: sendDuration
+    });
+    
+    return { 
+      success: true, 
+      messageId: info.messageId, 
+      response: info.response,
+      duration: sendDuration
+    };
+  } catch (error) {
+    console.error(`${logPrefix} Failed to send email:`, {
+      error: error instanceof Error ? error.message : String(error),
+      code: (error as any)?.code,
+      command: (error as any)?.command,
+      response: (error as any)?.response,
+      responseCode: (error as any)?.responseCode
+    });
+    
+    // Log failed delivery
+    await logEmailDelivery(ticket.id, ticket.reporterEmail!, action, 'failed', {
+      error: error instanceof Error ? error.message : String(error),
+      code: (error as any)?.code
+    });
+    
+    throw error;
+  }
+}
+
+async function logEmailDelivery(ticketId: number, email: string, action: string, status: 'success' | 'failed', details: any) {
+  try {
+    await ticketDB.exec`
+      INSERT INTO email_logs (ticket_id, recipient_email, action, status, details, created_at)
+      VALUES (${ticketId}, ${email}, ${action}, ${status}, ${JSON.stringify(details)}, NOW())
+    `;
+    console.log(`[EMAIL-${ticketId}] Email delivery logged: ${status}`);
+  } catch (error) {
+    console.error(`[EMAIL-${ticketId}] Failed to log email delivery:`, error);
+  }
 }
 
 function generateHTMLEmailBody(ticket: Ticket, action: "created" | "updated"): string {
@@ -280,6 +433,7 @@ Email sent at ${new Date().toLocaleString()}
 
 async function getSMTPConfig(): Promise<SMTPConfig | null> {
   try {
+    console.log("[SMTP-CONFIG] Fetching SMTP configuration from database...");
     const row = await ticketDB.queryRow<{
       id: number;
       provider: string;
@@ -291,8 +445,18 @@ async function getSMTPConfig(): Promise<SMTPConfig | null> {
     }>`SELECT * FROM smtp_config ORDER BY created_at DESC LIMIT 1`;
 
     if (!row) {
+      console.log("[SMTP-CONFIG] No SMTP configuration found in database");
       return null;
     }
+
+    console.log("[SMTP-CONFIG] SMTP configuration found:", {
+      id: row.id,
+      provider: row.provider,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      fromEmail: row.from_email
+    });
 
     return {
       id: row.id,
@@ -304,7 +468,7 @@ async function getSMTPConfig(): Promise<SMTPConfig | null> {
       fromEmail: row.from_email,
     };
   } catch (error) {
-    console.error("Failed to get SMTP config:", error);
+    console.error("[SMTP-CONFIG] Failed to get SMTP config from database:", error);
     return null;
   }
 }

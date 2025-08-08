@@ -14,9 +14,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import SystemLogo from "../components/SystemLogo";
-import { Save, Mail, Settings as SettingsIcon, Palette, Upload, Send, CheckCircle, AlertCircle } from "lucide-react";
+import { 
+  Save, 
+  Mail, 
+  Settings as SettingsIcon, 
+  Palette, 
+  Send, 
+  CheckCircle, 
+  AlertCircle,
+  Activity,
+  Trash2,
+  RefreshCw,
+  Eye,
+  EyeOff
+} from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -41,6 +63,7 @@ export default function Settings() {
   });
 
   const [testEmail, setTestEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const { data: currentSMTPConfig, isLoading: smtpLoading } = useQuery({
     queryKey: ["smtp-config"],
@@ -52,10 +75,23 @@ export default function Settings() {
     queryFn: () => backend.ticket.getSystemConfig(),
   });
 
+  const { data: emailStats, isLoading: emailStatsLoading } = useQuery({
+    queryKey: ["email-stats"],
+    queryFn: () => backend.ticket.getEmailStats(),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const { data: emailLogs, isLoading: emailLogsLoading } = useQuery({
+    queryKey: ["email-logs"],
+    queryFn: () => backend.ticket.listEmailLogs({ limit: 20 }),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
   const configureSMTPMutation = useMutation({
     mutationFn: (data: any) => backend.ticket.configureSMTP(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["smtp-config"] });
+      queryClient.invalidateQueries({ queryKey: ["email-stats"] });
       toast({
         title: "SMTP configured",
         description: "Email settings have been saved and tested successfully.",
@@ -74,6 +110,8 @@ export default function Settings() {
   const testSMTPMutation = useMutation({
     mutationFn: (data: { testEmail: string }) => backend.ticket.testSMTP(data),
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["email-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["email-logs"] });
       if (result.success) {
         toast({
           title: "Test email sent",
@@ -111,6 +149,26 @@ export default function Settings() {
       toast({
         title: "Error",
         description: error.message || "Failed to save system settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const clearLogsMutation = useMutation({
+    mutationFn: (daysOld: number) => backend.ticket.clearOldEmailLogs({ daysOld }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["email-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["email-stats"] });
+      toast({
+        title: "Logs cleared",
+        description: `${result.deletedCount} old email logs have been deleted.`,
+      });
+    },
+    onError: (error: any) => {
+      console.error("Failed to clear logs:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clear email logs.",
         variant: "destructive",
       });
     },
@@ -228,6 +286,25 @@ export default function Settings() {
     updateSystemConfigMutation.mutate(updateData);
   };
 
+  const handleRefreshLogs = () => {
+    queryClient.invalidateQueries({ queryKey: ["email-logs"] });
+    queryClient.invalidateQueries({ queryKey: ["email-stats"] });
+  };
+
+  const getStatusBadge = (status: 'success' | 'failed') => {
+    return status === 'success' ? (
+      <Badge variant="default" className="bg-green-100 text-green-800">
+        <CheckCircle className="w-3 h-3 mr-1" />
+        Success
+      </Badge>
+    ) : (
+      <Badge variant="destructive">
+        <AlertCircle className="w-3 h-3 mr-1" />
+        Failed
+      </Badge>
+    );
+  };
+
   if (smtpLoading || systemLoading) {
     return (
       <div className="space-y-6">
@@ -253,14 +330,18 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="system" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="system" className="flex items-center">
             <Palette className="w-4 h-4 mr-2" />
-            System Configuration
+            System
           </TabsTrigger>
           <TabsTrigger value="email" className="flex items-center">
             <Mail className="w-4 h-4 mr-2" />
-            Email Configuration
+            Email Config
+          </TabsTrigger>
+          <TabsTrigger value="email-logs" className="flex items-center">
+            <Activity className="w-4 h-4 mr-2" />
+            Email Logs
           </TabsTrigger>
         </TabsList>
 
@@ -462,14 +543,29 @@ export default function Settings() {
 
                     <div className="space-y-2">
                       <Label htmlFor="password">Password *</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={smtpConfig.password}
-                        onChange={(e) => setSMTPConfig({ ...smtpConfig, password: e.target.value })}
-                        placeholder="Your email password or app password"
-                        required
-                      />
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          value={smtpConfig.password}
+                          onChange={(e) => setSMTPConfig({ ...smtpConfig, password: e.target.value })}
+                          placeholder="Your email password or app password"
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -557,38 +653,207 @@ export default function Settings() {
                 )}
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="email-logs">
+          <div className="space-y-6">
+            {/* Email Statistics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Activity className="w-5 h-5 mr-2" />
+                    Email Delivery Statistics
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshLogs}
+                    disabled={emailStatsLoading}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${emailStatsLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {emailStatsLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-20 bg-gray-200 rounded animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : emailStats ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-blue-600">Total Sent</p>
+                          <p className="text-2xl font-bold text-blue-900">{emailStats.totalSent}</p>
+                        </div>
+                        <Mail className="w-8 h-8 text-blue-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-red-600">Failed</p>
+                          <p className="text-2xl font-bold text-red-900">{emailStats.totalFailed}</p>
+                        </div>
+                        <AlertCircle className="w-8 h-8 text-red-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-600">Success Rate</p>
+                          <p className="text-2xl font-bold text-green-900">{emailStats.successRate}%</p>
+                        </div>
+                        <CheckCircle className="w-8 h-8 text-green-500" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      No email statistics available yet. Send some emails to see statistics.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Email Logs */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Recent Email Logs</span>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => clearLogsMutation.mutate(30)}
+                      disabled={clearLogsMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Clear Old Logs (30+ days)
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {emailLogsLoading ? (
+                  <div className="space-y-4">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-16 bg-gray-200 rounded animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : emailLogs?.logs && emailLogs.logs.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Ticket ID</TableHead>
+                          <TableHead>Recipient</TableHead>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Details</TableHead>
+                          <TableHead>Sent At</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {emailLogs.logs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell className="font-medium">#{log.ticketId}</TableCell>
+                            <TableCell>{log.recipientEmail}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{log.action}</Badge>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(log.status)}</TableCell>
+                            <TableCell className="max-w-xs">
+                              {log.status === 'success' ? (
+                                <div className="text-sm text-green-600">
+                                  {log.details?.messageId && (
+                                    <div>ID: {log.details.messageId.substring(0, 20)}...</div>
+                                  )}
+                                  {log.details?.duration && (
+                                    <div>Duration: {log.details.duration}ms</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-red-600">
+                                  {log.details?.error && (
+                                    <div className="truncate" title={log.details.error}>
+                                      {log.details.error}
+                                    </div>
+                                  )}
+                                  {log.details?.code && (
+                                    <div>Code: {log.details.code}</div>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {new Date(log.createdAt).toLocaleDateString()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(log.createdAt).toLocaleTimeString()}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <Alert>
+                    <Mail className="h-4 w-4" />
+                    <AlertDescription>
+                      No email logs found. Email logs will appear here when emails are sent.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Email Integration Info */}
             <Card>
               <CardHeader>
-                <CardTitle>Email Notification Features</CardTitle>
+                <CardTitle>Email Monitoring & Troubleshooting</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Automatic Email Notifications:</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">How to Monitor Email Delivery:</h4>
                   <div className="text-sm text-gray-700 space-y-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <h5 className="font-medium text-gray-800 mb-1">When tickets are created:</h5>
+                        <h5 className="font-medium text-gray-800 mb-1">Success Indicators:</h5>
                         <ul className="list-disc list-inside space-y-1 ml-4 text-gray-600">
-                          <li>Reporter receives confirmation email</li>
-                          <li>Email includes ticket details and ID</li>
-                          <li>Instructions for tracking progress</li>
+                          <li>Green "Success" badge in logs</li>
+                          <li>Message ID present in details</li>
+                          <li>Response time under 10 seconds</li>
+                          <li>High success rate percentage</li>
                         </ul>
                       </div>
                       <div>
-                        <h5 className="font-medium text-gray-800 mb-1">When tickets are updated:</h5>
+                        <h5 className="font-medium text-gray-800 mb-1">Failure Indicators:</h5>
                         <ul className="list-disc list-inside space-y-1 ml-4 text-gray-600">
-                          <li>Reporter receives update notification</li>
-                          <li>Status and priority changes included</li>
-                          <li>Engineer assignment notifications</li>
+                          <li>Red "Failed" badge in logs</li>
+                          <li>Error message in details</li>
+                          <li>SMTP error codes (5xx, 4xx)</li>
+                          <li>Connection timeout errors</li>
                         </ul>
                       </div>
                     </div>
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
                       <p className="text-sm text-blue-800">
-                        <strong>Note:</strong> Email notifications are only sent to reporters who have provided an email address. 
-                        Engineers and admins can configure their own notification preferences.
+                        <strong>Troubleshooting Tips:</strong> Check SMTP credentials, verify server settings, 
+                        ensure firewall allows SMTP traffic, and check recipient email validity.
                       </p>
                     </div>
                   </div>

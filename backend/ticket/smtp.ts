@@ -2,7 +2,7 @@ import { api, APIError } from "encore.dev/api";
 import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { SMTPConfig } from "./types";
-import nodemailer from "nodemailer";
+import * as nodemailer from "nodemailer";
 
 export interface ConfigureSMTPRequest {
   provider: string;
@@ -260,7 +260,7 @@ async function sendTestEmail(config: SMTPConfig, testEmail: string): Promise<voi
       username: transporterConfig.auth.user
     });
 
-    const transporter = nodemailer.createTransporter(transporterConfig);
+    const transporter = nodemailer.createTransport(transporterConfig);
 
     const mailOptions = {
       from: `"IDESOLUSI Helpdesk" <${config.fromEmail}>`,

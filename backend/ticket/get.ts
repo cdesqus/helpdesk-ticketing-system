@@ -1,4 +1,5 @@
 import { api, APIError } from "encore.dev/api";
+import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { Ticket, TicketStatus, TicketPriority } from "./types";
 
@@ -6,10 +7,12 @@ export interface GetTicketRequest {
   id: number;
 }
 
-// Retrieves a specific ticket by ID.
+// Retrieves a specific ticket by ID with role-based access control.
 export const get = api<GetTicketRequest, Ticket>(
-  { expose: true, method: "GET", path: "/tickets/:id" },
+  { auth: true, expose: true, method: "GET", path: "/tickets/:id" },
   async (req) => {
+    const auth = getAuthData()!;
+    
     const row = await ticketDB.queryRow<{
       id: number;
       subject: string;
@@ -29,6 +32,20 @@ export const get = api<GetTicketRequest, Ticket>(
     if (!row) {
       throw APIError.notFound("ticket not found");
     }
+
+    // Apply role-based access control
+    if (auth.role === "engineer") {
+      // Engineers can only view tickets assigned to them
+      if (row.assigned_engineer !== auth.fullName) {
+        throw APIError.permissionDenied("you can only view tickets assigned to you");
+      }
+    } else if (auth.role === "reporter") {
+      // Reporters can only view their own tickets
+      if (row.reporter_email !== auth.email) {
+        throw APIError.permissionDenied("you can only view your own tickets");
+      }
+    }
+    // Admins can view all tickets
 
     return {
       id: row.id,

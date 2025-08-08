@@ -1,4 +1,5 @@
 import { api, APIError } from "encore.dev/api";
+import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { Ticket, TicketStatus, TicketPriority } from "./types";
 import { sendTicketNotification } from "./email";
@@ -16,19 +17,41 @@ export interface UpdateTicketRequest {
   customDate?: Date;
 }
 
-// Updates an existing ticket.
+// Updates an existing ticket with role-based permissions.
 export const update = api<UpdateTicketRequest, Ticket>(
-  { expose: true, method: "PUT", path: "/tickets/:id" },
+  { auth: true, expose: true, method: "PUT", path: "/tickets/:id" },
   async (req) => {
+    const auth = getAuthData()!;
+    
     const existingTicket = await ticketDB.queryRow<{
       id: number;
       status: TicketStatus;
       reporter_email: string | null;
-    }>`SELECT id, status, reporter_email FROM tickets WHERE id = ${req.id}`;
+      assigned_engineer: string | null;
+    }>`SELECT id, status, reporter_email, assigned_engineer FROM tickets WHERE id = ${req.id}`;
 
     if (!existingTicket) {
       throw APIError.notFound("ticket not found");
     }
+
+    // Apply role-based access control
+    if (auth.role === "engineer") {
+      // Engineers can only update tickets assigned to them and only certain fields
+      if (existingTicket.assigned_engineer !== auth.fullName) {
+        throw APIError.permissionDenied("you can only update tickets assigned to you");
+      }
+      // Engineers can only update status and add comments (handled in comments endpoint)
+      if (req.subject !== undefined || req.description !== undefined || 
+          req.assignedEngineer !== undefined || req.reporterName !== undefined ||
+          req.reporterEmail !== undefined || req.companyName !== undefined ||
+          req.customDate !== undefined || req.priority !== undefined) {
+        throw APIError.permissionDenied("engineers can only update ticket status");
+      }
+    } else if (auth.role === "reporter") {
+      // Reporters cannot update tickets
+      throw APIError.permissionDenied("reporters cannot update tickets");
+    }
+    // Admins can update all fields
 
     const updates: string[] = [];
     const params: any[] = [];

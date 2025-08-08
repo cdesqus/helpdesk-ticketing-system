@@ -1,4 +1,5 @@
 import { api, APIError } from "encore.dev/api";
+import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { Ticket, TicketStatus, TicketPriority } from "./types";
 import { sendTicketNotification } from "./email";
@@ -10,17 +11,32 @@ export interface CloseTicketRequest {
 
 // Closes a ticket and optionally adds a closing comment.
 export const closeTicket = api<CloseTicketRequest, Ticket>(
-  { expose: true, method: "POST", path: "/tickets/:id/close" },
+  { auth: true, expose: true, method: "POST", path: "/tickets/:id/close" },
   async (req) => {
+    const auth = getAuthData()!;
+    
     const existingTicket = await ticketDB.queryRow<{
       id: number;
       status: TicketStatus;
       reporter_email: string | null;
-    }>`SELECT id, status, reporter_email FROM tickets WHERE id = ${req.id}`;
+      assigned_engineer: string | null;
+    }>`SELECT id, status, reporter_email, assigned_engineer FROM tickets WHERE id = ${req.id}`;
 
     if (!existingTicket) {
       throw APIError.notFound("ticket not found");
     }
+
+    // Apply role-based access control
+    if (auth.role === "engineer") {
+      // Engineers can only close tickets assigned to them
+      if (existingTicket.assigned_engineer !== auth.fullName) {
+        throw APIError.permissionDenied("you can only close tickets assigned to you");
+      }
+    } else if (auth.role === "reporter") {
+      // Reporters cannot close tickets
+      throw APIError.permissionDenied("reporters cannot close tickets");
+    }
+    // Admins can close any ticket
 
     const now = new Date();
 
@@ -56,7 +72,7 @@ export const closeTicket = api<CloseTicketRequest, Ticket>(
         INSERT INTO ticket_comments (
           ticket_id, author_name, content, is_internal, created_at, updated_at
         ) VALUES (
-          ${req.id}, 'System', ${`Ticket closed. Reason: ${req.reason}`}, false, ${now}, ${now}
+          ${req.id}, ${auth.fullName}, ${`Ticket closed. Reason: ${req.reason}`}, false, ${now}, ${now}
         )
       `;
     }

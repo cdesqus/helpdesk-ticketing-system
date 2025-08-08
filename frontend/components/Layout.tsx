@@ -1,12 +1,16 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, 
   Ticket, 
   Plus, 
   Settings,
-  HelpCircle
+  HelpCircle,
+  Users,
+  LogOut
 } from "lucide-react";
 
 interface LayoutProps {
@@ -15,13 +19,35 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const { user, logout } = useAuth();
 
-  const navigation = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
-    { name: "Tickets", href: "/tickets", icon: Ticket },
-    { name: "New Ticket", href: "/tickets/new", icon: Plus },
-    { name: "Settings", href: "/settings", icon: Settings },
-  ];
+  if (!user) {
+    return <>{children}</>;
+  }
+
+  const getNavigation = () => {
+    const baseNav = [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin"] },
+      { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "engineer", "reporter"] },
+    ];
+
+    // Add role-specific navigation items
+    if (user.role === "admin") {
+      baseNav.push(
+        { name: "New Ticket", href: "/tickets/new", icon: Plus, roles: ["admin"] },
+        { name: "Users", href: "/users", icon: Users, roles: ["admin"] },
+        { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] }
+      );
+    } else if (user.role === "reporter") {
+      baseNav.push(
+        { name: "New Ticket", href: "/tickets/new", icon: Plus, roles: ["reporter"] }
+      );
+    }
+
+    return baseNav.filter(item => item.roles.includes(user.role));
+  };
+
+  const navigation = getNavigation();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -35,6 +61,15 @@ export default function Layout({ children }: LayoutProps) {
                 Helpdesk
               </span>
             </div>
+            
+            {/* User Info */}
+            <div className="px-4 mt-6">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
+                <p className="text-xs text-gray-500">{user.role}</p>
+              </div>
+            </div>
+            
             <div className="mt-8 flex-grow flex flex-col">
               <nav className="flex-1 px-2 space-y-1">
                 {navigation.map((item) => {
@@ -61,6 +96,18 @@ export default function Layout({ children }: LayoutProps) {
                   );
                 })}
               </nav>
+              
+              {/* Logout Button */}
+              <div className="px-2 pb-4">
+                <Button
+                  variant="ghost"
+                  onClick={logout}
+                  className="w-full justify-start text-gray-600 hover:text-gray-900"
+                >
+                  <LogOut className="mr-3 h-5 w-5" />
+                  Logout
+                </Button>
+              </div>
             </div>
           </div>
         </div>

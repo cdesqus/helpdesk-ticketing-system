@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import backend from "~backend/client";
+import { useBackend, useAuth } from "../hooks/useAuth";
 import type { TicketComment } from "~backend/ticket/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
@@ -27,11 +26,11 @@ interface CommentSectionProps {
 
 export default function CommentSection({ ticketId }: CommentSectionProps) {
   const { toast } = useToast();
+  const backend = useBackend();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState({
     content: "",
-    authorName: "",
-    authorEmail: "",
     isInternal: false,
   });
   const [editingComment, setEditingComment] = useState<number | null>(null);
@@ -49,8 +48,6 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
       queryClient.invalidateQueries({ queryKey: ["ticket", ticketId.toString()] });
       setNewComment({
         content: "",
-        authorName: "",
-        authorEmail: "",
         isInternal: false,
       });
       toast({
@@ -58,11 +55,11 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
         description: "Your comment has been added successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to add comment:", error);
       toast({
         title: "Error",
-        description: "Failed to add comment. Please try again.",
+        description: error.message || "Failed to add comment. Please try again.",
         variant: "destructive",
       });
     },
@@ -80,11 +77,11 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
         description: "Comment has been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to update comment:", error);
       toast({
         title: "Error",
-        description: "Failed to update comment. Please try again.",
+        description: error.message || "Failed to update comment. Please try again.",
         variant: "destructive",
       });
     },
@@ -99,11 +96,11 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
         description: "Comment has been deleted successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Failed to delete comment:", error);
       toast({
         title: "Error",
-        description: "Failed to delete comment. Please try again.",
+        description: error.message || "Failed to delete comment. Please try again.",
         variant: "destructive",
       });
     },
@@ -112,10 +109,10 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newComment.content.trim() || !newComment.authorName.trim()) {
+    if (!newComment.content.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields.",
+        description: "Please enter a comment.",
         variant: "destructive",
       });
       return;
@@ -124,7 +121,6 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
     addCommentMutation.mutate({
       ticketId,
       ...newComment,
-      authorEmail: newComment.authorEmail || undefined,
     });
   };
 
@@ -160,6 +156,10 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
     }
   };
 
+  const canEditComment = (comment: TicketComment) => {
+    return user?.role === "admin" || comment.authorName === user?.fullName;
+  };
+
   const comments = commentsData?.comments || [];
 
   return (
@@ -173,31 +173,8 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
       <CardContent className="space-y-6">
         {/* Add New Comment */}
         <form onSubmit={handleAddComment} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="authorName">Your Name *</Label>
-              <Input
-                id="authorName"
-                value={newComment.authorName}
-                onChange={(e) => setNewComment({ ...newComment, authorName: e.target.value })}
-                placeholder="Enter your name"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="authorEmail">Your Email</Label>
-              <Input
-                id="authorEmail"
-                type="email"
-                value={newComment.authorEmail}
-                onChange={(e) => setNewComment({ ...newComment, authorEmail: e.target.value })}
-                placeholder="your.email@example.com"
-              />
-            </div>
-          </div>
-          
           <div className="space-y-2">
-            <Label htmlFor="content">Comment *</Label>
+            <Label htmlFor="content">Add Comment</Label>
             <Textarea
               id="content"
               value={newComment.content}
@@ -209,18 +186,20 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="isInternal"
-                checked={newComment.isInternal}
-                onCheckedChange={(checked) => 
-                  setNewComment({ ...newComment, isInternal: checked as boolean })
-                }
-              />
-              <Label htmlFor="isInternal" className="text-sm">
-                Internal comment (not visible to reporter)
-              </Label>
-            </div>
+            {user?.role !== "reporter" && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isInternal"
+                  checked={newComment.isInternal}
+                  onCheckedChange={(checked) => 
+                    setNewComment({ ...newComment, isInternal: checked as boolean })
+                  }
+                />
+                <Label htmlFor="isInternal" className="text-sm">
+                  Internal comment (not visible to reporter)
+                </Label>
+              </div>
+            )}
             
             <Button
               type="submit"
@@ -279,20 +258,24 @@ export default function CommentSection({ ticketId }: CommentSectionProps) {
                       {new Date(comment.createdAt).toLocaleString()}
                       {comment.updatedAt !== comment.createdAt && " (edited)"}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditComment(comment)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteComment(comment.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {canEditComment(comment) && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditComment(comment)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteComment(comment.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
 

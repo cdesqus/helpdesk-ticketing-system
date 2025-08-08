@@ -1,4 +1,5 @@
-import { api } from "encore.dev/api";
+import { api, APIError } from "encore.dev/api";
+import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { Ticket, TicketStatus, TicketPriority } from "./types";
 import { sendTicketNotification } from "./email";
@@ -9,7 +10,7 @@ export interface CreateTicketRequest {
   status?: TicketStatus;
   priority?: TicketPriority;
   assignedEngineer?: string;
-  reporterName: string;
+  reporterName?: string;
   reporterEmail?: string;
   companyName?: string;
   customDate?: Date;
@@ -17,13 +18,29 @@ export interface CreateTicketRequest {
 
 // Creates a new ticket.
 export const create = api<CreateTicketRequest, Ticket>(
-  { expose: true, method: "POST", path: "/tickets" },
+  { auth: true, expose: true, method: "POST", path: "/tickets" },
   async (req) => {
+    const auth = getAuthData()!;
     const now = new Date();
     const customDate = req.customDate || now;
     
     // Handle "unassigned" value from frontend
     const assignedEngineer = req.assignedEngineer === "unassigned" ? null : req.assignedEngineer;
+    
+    // Set reporter info based on user role
+    let reporterName = req.reporterName || auth.fullName;
+    let reporterEmail = req.reporterEmail || auth.email;
+    
+    // Reporters can only create tickets for themselves
+    if (auth.role === "reporter") {
+      reporterName = auth.fullName;
+      reporterEmail = auth.email;
+    }
+    
+    // Engineers cannot create tickets (only admins and reporters can)
+    if (auth.role === "engineer") {
+      throw APIError.permissionDenied("engineers cannot create tickets");
+    }
     
     const row = await ticketDB.queryRow<{
       id: number;
@@ -45,7 +62,7 @@ export const create = api<CreateTicketRequest, Ticket>(
         reporter_name, reporter_email, company_name, custom_date, created_at, updated_at
       ) VALUES (
         ${req.subject}, ${req.description}, ${req.status || "Open"}, ${req.priority || "Medium"},
-        ${assignedEngineer || null}, ${req.reporterName}, ${req.reporterEmail || null},
+        ${assignedEngineer || null}, ${reporterName}, ${reporterEmail || null},
         ${req.companyName || null}, ${customDate}, ${customDate}, ${now}
       )
       RETURNING *
@@ -72,7 +89,7 @@ export const create = api<CreateTicketRequest, Ticket>(
     };
 
     // Send email notification
-    if (req.reporterEmail) {
+    if (reporterEmail) {
       try {
         await sendTicketNotification(ticket, "created");
       } catch (error) {

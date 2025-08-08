@@ -1,21 +1,29 @@
-import { api } from "encore.dev/api";
-import { ticketDB } from "./db";
+import { api, APIError } from "encore.dev/api";
+import { getAuthData } from "~encore/auth";
+import { authDB } from "../auth/db";
 import type { Engineer } from "./types";
 
 export interface ListEngineersResponse {
   engineers: Engineer[];
 }
 
-// Retrieves all engineers.
+// Retrieves all engineers from the auth system.
 export const listEngineers = api<void, ListEngineersResponse>(
-  { expose: true, method: "GET", path: "/engineers" },
+  { auth: true, expose: true, method: "GET", path: "/engineers" },
   async () => {
-    const rows = await ticketDB.queryAll<{
+    const auth = getAuthData()!;
+    
+    // Only admins and engineers can list engineers
+    if (auth.role === "reporter") {
+      throw APIError.permissionDenied("reporters cannot list engineers");
+    }
+
+    const rows = await authDB.queryAll<{
       id: number;
-      name: string;
+      full_name: string;
       email: string;
       created_at: Date;
-    }>`SELECT * FROM engineers ORDER BY name`;
+    }>`SELECT id, full_name as name, email, created_at FROM users WHERE role = 'engineer' AND status = 'active' ORDER BY full_name`;
 
     const engineers: Engineer[] = rows.map(row => ({
       id: row.id,
@@ -25,38 +33,5 @@ export const listEngineers = api<void, ListEngineersResponse>(
     }));
 
     return { engineers };
-  }
-);
-
-export interface CreateEngineerRequest {
-  name: string;
-  email: string;
-}
-
-// Creates a new engineer.
-export const createEngineer = api<CreateEngineerRequest, Engineer>(
-  { expose: true, method: "POST", path: "/engineers" },
-  async (req) => {
-    const row = await ticketDB.queryRow<{
-      id: number;
-      name: string;
-      email: string;
-      created_at: Date;
-    }>`
-      INSERT INTO engineers (name, email)
-      VALUES (${req.name}, ${req.email})
-      RETURNING *
-    `;
-
-    if (!row) {
-      throw new Error("Failed to create engineer");
-    }
-
-    return {
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      createdAt: row.created_at,
-    };
   }
 );

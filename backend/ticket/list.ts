@@ -1,5 +1,6 @@
 import { api } from "encore.dev/api";
 import { Query } from "encore.dev/api";
+import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { Ticket, TicketStatus, TicketPriority } from "./types";
 
@@ -19,13 +20,29 @@ export interface ListTicketsResponse {
   total: number;
 }
 
-// Retrieves all tickets with optional filtering.
+// Retrieves tickets based on user role and permissions.
 export const list = api<ListTicketsRequest, ListTicketsResponse>(
-  { expose: true, method: "GET", path: "/tickets" },
+  { auth: true, expose: true, method: "GET", path: "/tickets" },
   async (req) => {
+    const auth = getAuthData()!;
+    
     let whereClause = "WHERE 1=1";
     const params: any[] = [];
     let paramIndex = 1;
+
+    // Apply role-based filtering
+    if (auth.role === "engineer") {
+      // Engineers can only see tickets assigned to them
+      whereClause += ` AND assigned_engineer = $${paramIndex}`;
+      params.push(auth.fullName);
+      paramIndex++;
+    } else if (auth.role === "reporter") {
+      // Reporters can only see their own tickets
+      whereClause += ` AND reporter_email = $${paramIndex}`;
+      params.push(auth.email);
+      paramIndex++;
+    }
+    // Admins can see all tickets (no additional filtering)
 
     if (req.status) {
       whereClause += ` AND status = $${paramIndex}`;
@@ -39,7 +56,7 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
       paramIndex++;
     }
 
-    if (req.assignedEngineer) {
+    if (req.assignedEngineer && auth.role === "admin") {
       whereClause += ` AND assigned_engineer = $${paramIndex}`;
       params.push(req.assignedEngineer);
       paramIndex++;

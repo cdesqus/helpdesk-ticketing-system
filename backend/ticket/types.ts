@@ -61,6 +61,8 @@ export interface SMTPConfig {
   username: string;
   password: string;
   fromEmail: string;
+  useSSL?: boolean;
+  useTLS?: boolean;
 }
 
 export interface SystemConfig {

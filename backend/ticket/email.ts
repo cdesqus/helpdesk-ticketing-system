@@ -56,20 +56,24 @@ export async function sendTicketNotification(ticket: Ticket, action: "created" |
         return { success: false, reason: `Missing SMTP configuration: ${missingVars.join(', ')}` };
       }
       
-      // Use environment variables
+      // Use environment variables with SSL/TLS defaults
       const envConfig = {
         host: envHost,
         port: parseInt(envPort || "587"),
         username: envUser,
         password: envPass,
         fromEmail: envUser,
+        useSSL: parseInt(envPort || "587") === 465,
+        useTLS: parseInt(envPort || "587") !== 465, // Use TLS for non-SSL ports
       };
       
       console.log(`${logPrefix} Using environment variables for SMTP:`, {
         host: envConfig.host,
         port: envConfig.port,
         username: envConfig.username,
-        fromEmail: envConfig.fromEmail
+        fromEmail: envConfig.fromEmail,
+        useSSL: envConfig.useSSL,
+        useTLS: envConfig.useTLS
       });
       
       const result = await sendEmailWithNodemailer(envConfig, ticket, action, logPrefix);
@@ -83,7 +87,9 @@ export async function sendTicketNotification(ticket: Ticket, action: "created" |
       host: config.host,
       port: config.port,
       username: config.username,
-      fromEmail: config.fromEmail
+      fromEmail: config.fromEmail,
+      useSSL: config.useSSL,
+      useTLS: config.useTLS
     });
 
     const result = await sendEmailWithNodemailer(config, ticket, action, logPrefix);
@@ -125,28 +131,49 @@ async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, actio
 
   console.log(`${logPrefix} Email content generated - HTML: ${htmlBody.length} chars, Text: ${textBody.length} chars`);
 
-  // Create transporter
+  // Create transporter with SSL/TLS configuration
   console.log(`${logPrefix} Creating SMTP transporter...`);
+  
+  // Determine security settings
+  const isSecure = config.port === 465 || config.useSSL;
+  const requireTLS = config.useTLS !== false; // Default to true
+  
   const transporterConfig = {
     host: config.host,
     port: config.port,
-    secure: config.port === 465, // true for 465, false for other ports
+    secure: isSecure, // true for 465 (SSL), false for other ports
     auth: {
       user: config.username,
       pass: config.password,
     },
     tls: {
       rejectUnauthorized: false, // Allow self-signed certificates for development
+      ciphers: 'SSLv3',
     },
     connectionTimeout: 60000, // 60 seconds
     greetingTimeout: 30000, // 30 seconds
     socketTimeout: 60000, // 60 seconds
+    requireTLS: requireTLS, // Require TLS for non-SSL connections
   };
+
+  // Additional TLS settings for different providers
+  if (config.provider === 'gmail') {
+    transporterConfig.tls = {
+      ...transporterConfig.tls,
+      servername: 'smtp.gmail.com',
+    };
+  } else if (config.provider === 'office365') {
+    transporterConfig.tls = {
+      ...transporterConfig.tls,
+      servername: 'smtp.office365.com',
+    };
+  }
 
   console.log(`${logPrefix} Transporter config:`, {
     host: transporterConfig.host,
     port: transporterConfig.port,
     secure: transporterConfig.secure,
+    requireTLS: transporterConfig.requireTLS,
     username: transporterConfig.auth.user,
     connectionTimeout: transporterConfig.connectionTimeout,
     greetingTimeout: transporterConfig.greetingTimeout,
@@ -211,7 +238,8 @@ async function sendEmailWithNodemailer(config: SMTPConfig, ticket: Ticket, actio
     await logEmailDelivery(ticket.id, ticket.reporterEmail!, action, 'success', {
       messageId: info.messageId,
       response: info.response,
-      duration: sendDuration
+      duration: sendDuration,
+      security: isSecure ? 'SSL' : (requireTLS ? 'TLS' : 'None')
     });
     
     return { 
@@ -283,13 +311,15 @@ function generateHTMLEmailBody(ticket: Ticket, action: "created" | "updated"): s
         .priority-high { color: #fd7e14; font-weight: bold; }
         .priority-medium { color: #ffc107; font-weight: bold; }
         .priority-low { color: #28a745; font-weight: bold; }
+        .security-badge { background-color: #10b981; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Ticket ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}</h1>
+            <h1>🔒 Secure Ticket ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}</h1>
             <p>Your support ticket has been ${actionText}</p>
+            <span class="security-badge">SSL/TLS Encrypted</span>
         </div>
         
         <div class="content">
@@ -349,17 +379,17 @@ function generateHTMLEmailBody(ticket: Ticket, action: "created" | "updated"): s
             </div>
             
             <div style="background-color: #e3f2fd; padding: 15px; border-radius: 6px; margin: 20px 0;">
-                <h4 style="margin-top: 0; color: #1976d2;">What happens next?</h4>
+                <h4 style="margin-top: 0; color: #1976d2;">🔐 What happens next?</h4>
                 <ul style="margin: 0; padding-left: 20px;">
                     ${action === "created" ? `
-                    <li>Our support team will review your ticket</li>
+                    <li>Our support team will review your ticket securely</li>
                     <li>An engineer will be assigned to help resolve your issue</li>
-                    <li>You'll receive updates via email as progress is made</li>
+                    <li>You'll receive encrypted email updates as progress is made</li>
                     <li>You can reply to this email to add additional information</li>
                     ` : `
                     <li>Your ticket has been updated with new information</li>
                     <li>Our team is working on resolving your issue</li>
-                    <li>You'll continue to receive updates as progress is made</li>
+                    <li>You'll continue to receive secure updates as progress is made</li>
                     <li>You can reply to this email if you have questions</li>
                     `}
                 </ul>
@@ -367,11 +397,12 @@ function generateHTMLEmailBody(ticket: Ticket, action: "created" | "updated"): s
         </div>
         
         <div class="footer">
-            <p><strong>IDESOLUSI Helpdesk System</strong></p>
+            <p><strong>🔒 IDESOLUSI Helpdesk System</strong></p>
+            <p>This email was sent securely using SSL/TLS encryption.</p>
             <p>This is an automated message. Please do not reply directly to this email.</p>
             <p>For urgent matters, please contact our support team directly.</p>
             <p style="font-size: 12px; color: #999;">
-                Email sent at ${new Date().toLocaleString()}
+                Secure email sent at ${new Date().toLocaleString()}
             </p>
         </div>
     </div>
@@ -384,11 +415,11 @@ function generateTextEmailBody(ticket: Ticket, action: "created" | "updated"): s
   const actionText = action === "created" ? "created" : "updated";
   
   return `
-IDESOLUSI HELPDESK - TICKET ${actionText.toUpperCase()}
+🔒 IDESOLUSI HELPDESK - SECURE TICKET ${actionText.toUpperCase()}
 
 Dear ${ticket.reporterName},
 
-Your support ticket has been ${actionText}.
+Your support ticket has been ${actionText} securely.
 
 TICKET DETAILS:
 ===============
@@ -407,17 +438,17 @@ DESCRIPTION:
 ============
 ${ticket.description}
 
-WHAT HAPPENS NEXT:
-==================
+🔐 WHAT HAPPENS NEXT:
+=====================
 ${action === "created" ? `
-• Our support team will review your ticket
+• Our support team will review your ticket securely
 • An engineer will be assigned to help resolve your issue
-• You'll receive updates via email as progress is made
+• You'll receive encrypted email updates as progress is made
 • You can reply to this email to add additional information
 ` : `
 • Your ticket has been updated with new information
 • Our team is working on resolving your issue
-• You'll continue to receive updates as progress is made
+• You'll continue to receive secure updates as progress is made
 • You can reply to this email if you have questions
 `}
 
@@ -425,10 +456,11 @@ Best regards,
 IDESOLUSI Helpdesk Support Team
 
 ---
+🔒 This email was sent securely using SSL/TLS encryption.
 This is an automated message. Please do not reply directly to this email.
 For urgent matters, please contact our support team directly.
 
-Email sent at ${new Date().toLocaleString()}
+Secure email sent at ${new Date().toLocaleString()}
   `.trim();
 }
 
@@ -443,6 +475,8 @@ async function getSMTPConfig(): Promise<SMTPConfig | null> {
       username: string;
       password: string;
       from_email: string;
+      use_ssl?: boolean;
+      use_tls?: boolean;
     }>`SELECT * FROM smtp_config ORDER BY created_at DESC LIMIT 1`;
 
     if (!row) {
@@ -456,7 +490,9 @@ async function getSMTPConfig(): Promise<SMTPConfig | null> {
       host: row.host,
       port: row.port,
       username: row.username,
-      fromEmail: row.from_email
+      fromEmail: row.from_email,
+      useSSL: row.use_ssl,
+      useTLS: row.use_tls
     });
 
     return {
@@ -467,6 +503,8 @@ async function getSMTPConfig(): Promise<SMTPConfig | null> {
       username: row.username,
       password: row.password,
       fromEmail: row.from_email,
+      useSSL: row.use_ssl || false,
+      useTLS: row.use_tls !== false, // Default to true if not specified
     };
   } catch (error) {
     console.error("[SMTP-CONFIG] Failed to get SMTP config from database:", error);

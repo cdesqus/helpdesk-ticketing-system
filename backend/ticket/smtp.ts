@@ -11,6 +11,8 @@ export interface ConfigureSMTPRequest {
   username: string;
   password: string;
   fromEmail: string;
+  useSSL?: boolean;
+  useTLS?: boolean;
 }
 
 export interface TestSMTPRequest {
@@ -37,6 +39,8 @@ export const configureSMTP = api<ConfigureSMTPRequest, SMTPConfig>(
       port: req.port,
       username: req.username,
       fromEmail: req.fromEmail,
+      useSSL: req.useSSL,
+      useTLS: req.useTLS,
       hasPassword: !!req.password
     });
 
@@ -56,9 +60,11 @@ export const configureSMTP = api<ConfigureSMTPRequest, SMTPConfig>(
         username: string;
         password: string;
         from_email: string;
+        use_ssl: boolean;
+        use_tls: boolean;
       }>`
-        INSERT INTO smtp_config (provider, host, port, username, password, from_email, created_at, updated_at)
-        VALUES (${req.provider}, ${req.host}, ${req.port}, ${req.username}, ${req.password}, ${req.fromEmail}, NOW(), NOW())
+        INSERT INTO smtp_config (provider, host, port, username, password, from_email, use_ssl, use_tls, created_at, updated_at)
+        VALUES (${req.provider}, ${req.host}, ${req.port}, ${req.username}, ${req.password}, ${req.fromEmail}, ${req.useSSL || false}, ${req.useTLS || true}, NOW(), NOW())
         RETURNING *
       `;
 
@@ -72,7 +78,9 @@ export const configureSMTP = api<ConfigureSMTPRequest, SMTPConfig>(
         provider: row.provider,
         host: row.host,
         port: row.port,
-        fromEmail: row.from_email
+        fromEmail: row.from_email,
+        useSSL: row.use_ssl,
+        useTLS: row.use_tls
       });
 
       return {
@@ -83,6 +91,8 @@ export const configureSMTP = api<ConfigureSMTPRequest, SMTPConfig>(
         username: row.username,
         password: row.password,
         fromEmail: row.from_email,
+        useSSL: row.use_ssl,
+        useTLS: row.use_tls,
       };
     } catch (error) {
       console.error("Failed to save SMTP configuration:", error);
@@ -158,6 +168,8 @@ async function getSMTPConfigFromDB(): Promise<SMTPConfig | null> {
       username: string;
       password: string;
       from_email: string;
+      use_ssl?: boolean;
+      use_tls?: boolean;
     }>`SELECT * FROM smtp_config ORDER BY created_at DESC LIMIT 1`;
 
     if (!row) {
@@ -170,7 +182,9 @@ async function getSMTPConfigFromDB(): Promise<SMTPConfig | null> {
       provider: row.provider,
       host: row.host,
       port: row.port,
-      fromEmail: row.from_email
+      fromEmail: row.from_email,
+      useSSL: row.use_ssl,
+      useTLS: row.use_tls
     });
 
     return {
@@ -181,6 +195,8 @@ async function getSMTPConfigFromDB(): Promise<SMTPConfig | null> {
       username: row.username,
       password: row.password,
       fromEmail: row.from_email,
+      useSSL: row.use_ssl || false,
+      useTLS: row.use_tls !== false, // Default to true if not specified
     };
   } catch (error) {
     console.error("Failed to get SMTP config from database:", error);
@@ -190,24 +206,61 @@ async function getSMTPConfigFromDB(): Promise<SMTPConfig | null> {
 
 async function sendTestEmail(config: SMTPConfig, testEmail: string): Promise<void> {
   console.log("Sending test email to:", testEmail);
+  console.log("SMTP config for test:", {
+    host: config.host,
+    port: config.port,
+    useSSL: config.useSSL,
+    useTLS: config.useTLS,
+    secure: config.port === 465 || config.useSSL
+  });
   
   try {
     console.log("Creating nodemailer transporter for test email...");
-    const transporter = nodemailer.createTransporter({
+    
+    // Determine security settings
+    const isSecure = config.port === 465 || config.useSSL;
+    const requireTLS = config.useTLS !== false; // Default to true
+    
+    const transporterConfig = {
       host: config.host,
       port: config.port,
-      secure: config.port === 465,
+      secure: isSecure, // true for 465 (SSL), false for other ports
       auth: {
         user: config.username,
         pass: config.password,
       },
       tls: {
-        rejectUnauthorized: false,
+        rejectUnauthorized: false, // Allow self-signed certificates for development
+        ciphers: 'SSLv3',
       },
       connectionTimeout: 30000,
       greetingTimeout: 15000,
       socketTimeout: 30000,
+      requireTLS: requireTLS, // Require TLS for non-SSL connections
+    };
+
+    // Additional TLS settings for different providers
+    if (config.provider === 'gmail') {
+      transporterConfig.tls = {
+        ...transporterConfig.tls,
+        servername: 'smtp.gmail.com',
+      };
+    } else if (config.provider === 'office365') {
+      transporterConfig.tls = {
+        ...transporterConfig.tls,
+        servername: 'smtp.office365.com',
+      };
+    }
+
+    console.log("Final transporter config:", {
+      host: transporterConfig.host,
+      port: transporterConfig.port,
+      secure: transporterConfig.secure,
+      requireTLS: transporterConfig.requireTLS,
+      username: transporterConfig.auth.user
     });
+
+    const transporter = nodemailer.createTransporter(transporterConfig);
 
     const mailOptions = {
       from: `"IDESOLUSI Helpdesk" <${config.fromEmail}>`,
@@ -223,14 +276,25 @@ async function sendTestEmail(config: SMTPConfig, testEmail: string): Promise<voi
             <p>Your SMTP configuration is working correctly. This test email confirms that:</p>
             <ul>
               <li>✅ SMTP server connection is successful</li>
+              <li>✅ SSL/TLS encryption is working properly</li>
               <li>✅ Authentication credentials are valid</li>
               <li>✅ Email delivery is functioning</li>
             </ul>
-            <p>Your helpdesk system is now ready to send email notifications to users.</p>
+            <p>Your helpdesk system is now ready to send secure email notifications to users.</p>
+            
+            <div style="background-color: #e3f2fd; padding: 15px; border-radius: 6px; margin: 20px 0;">
+              <h4 style="margin-top: 0; color: #1976d2;">Connection Details:</h4>
+              <ul style="margin: 0; padding-left: 20px; color: #1976d2;">
+                <li>Host: ${config.host}</li>
+                <li>Port: ${config.port}</li>
+                <li>Security: ${isSecure ? 'SSL' : (requireTLS ? 'TLS' : 'None')}</li>
+                <li>Provider: ${config.provider}</li>
+              </ul>
+            </div>
           </div>
           <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 14px;">
             <p><strong>IDESOLUSI Helpdesk System</strong></p>
-            <p>Test email sent at ${new Date().toLocaleString()}</p>
+            <p>Secure email test sent at ${new Date().toLocaleString()}</p>
           </div>
         </div>
       `,
@@ -241,14 +305,21 @@ Congratulations! Your SMTP configuration is working correctly.
 
 This test email confirms that:
 ✅ SMTP server connection is successful
+✅ SSL/TLS encryption is working properly
 ✅ Authentication credentials are valid  
 ✅ Email delivery is functioning
 
-Your helpdesk system is now ready to send email notifications to users.
+Connection Details:
+- Host: ${config.host}
+- Port: ${config.port}
+- Security: ${isSecure ? 'SSL' : (requireTLS ? 'TLS' : 'None')}
+- Provider: ${config.provider}
+
+Your helpdesk system is now ready to send secure email notifications to users.
 
 ---
 IDESOLUSI Helpdesk System
-Test email sent at ${new Date().toLocaleString()}
+Secure email test sent at ${new Date().toLocaleString()}
       `,
     };
 

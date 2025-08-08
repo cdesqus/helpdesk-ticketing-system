@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -37,7 +38,9 @@ import {
   Trash2,
   RefreshCw,
   Eye,
-  EyeOff
+  EyeOff,
+  Shield,
+  Lock
 } from "lucide-react";
 
 export default function Settings() {
@@ -52,6 +55,8 @@ export default function Settings() {
     username: "",
     password: "",
     fromEmail: "helpdesk@idesolusi.co.id",
+    useSSL: false,
+    useTLS: true,
   });
 
   const [systemConfig, setSystemConfig] = useState({
@@ -93,7 +98,7 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["smtp-config"] });
       toast({
         title: "SMTP configuration saved",
-        description: "Your email settings have been saved. You can now send a test email.",
+        description: "Your secure email settings have been saved. You can now send a test email.",
       });
     },
     onError: (error: any) => {
@@ -182,6 +187,8 @@ export default function Settings() {
         username: currentSMTPConfig.config.username,
         password: currentSMTPConfig.config.password,
         fromEmail: currentSMTPConfig.config.fromEmail,
+        useSSL: currentSMTPConfig.config.useSSL || false,
+        useTLS: currentSMTPConfig.config.useTLS !== false, // Default to true
       });
     }
   }, [currentSMTPConfig]);
@@ -208,6 +215,8 @@ export default function Settings() {
           ...prev,
           host: "smtp.gmail.com",
           port: 587,
+          useSSL: false,
+          useTLS: true,
         }));
         break;
       case "office365":
@@ -215,6 +224,8 @@ export default function Settings() {
           ...prev,
           host: "smtp.office365.com",
           port: 587,
+          useSSL: false,
+          useTLS: true,
         }));
         break;
       case "custom":
@@ -222,9 +233,20 @@ export default function Settings() {
           ...prev,
           host: "",
           port: 587,
+          useSSL: false,
+          useTLS: true,
         }));
         break;
     }
+  };
+
+  const handlePortChange = (port: number) => {
+    setSMTPConfig(prev => ({
+      ...prev,
+      port,
+      useSSL: port === 465,
+      useTLS: port !== 465,
+    }));
   };
 
   const handleSMTPSubmit = (e: React.FormEvent) => {
@@ -304,6 +326,28 @@ export default function Settings() {
     );
   };
 
+  const getSecurityInfo = () => {
+    if (smtpConfig.useSSL) {
+      return {
+        icon: <Shield className="w-4 h-4 text-green-600" />,
+        text: "SSL Encryption (Port 465)",
+        color: "text-green-600"
+      };
+    } else if (smtpConfig.useTLS) {
+      return {
+        icon: <Lock className="w-4 h-4 text-blue-600" />,
+        text: "TLS Encryption (STARTTLS)",
+        color: "text-blue-600"
+      };
+    } else {
+      return {
+        icon: <AlertCircle className="w-4 h-4 text-red-600" />,
+        text: "No Encryption (Not Recommended)",
+        color: "text-red-600"
+      };
+    }
+  };
+
   if (smtpLoading || systemLoading) {
     return (
       <div className="space-y-6">
@@ -320,6 +364,8 @@ export default function Settings() {
       </div>
     );
   }
+
+  const securityInfo = getSecurityInfo();
 
   return (
     <div className="space-y-6">
@@ -471,11 +517,26 @@ export default function Settings() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    <Mail className="w-5 h-5 mr-2" />
-                    SMTP Email Configuration
+                    <Shield className="w-5 h-5 mr-2" />
+                    Secure SMTP Email Configuration
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Security Status */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        {securityInfo.icon}
+                        <span className={`font-medium ${securityInfo.color}`}>
+                          {securityInfo.text}
+                        </span>
+                      </div>
+                      <Badge variant={smtpConfig.useSSL || smtpConfig.useTLS ? "default" : "destructive"}>
+                        {smtpConfig.useSSL || smtpConfig.useTLS ? "Secure" : "Insecure"}
+                      </Badge>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="provider">Email Provider *</Label>
@@ -487,7 +548,7 @@ export default function Settings() {
                           <SelectValue placeholder="Select email provider" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="gmail">Gmail</SelectItem>
+                          <SelectItem value="gmail">Gmail (Recommended)</SelectItem>
                           <SelectItem value="office365">Office 365</SelectItem>
                           <SelectItem value="custom">Custom SMTP</SelectItem>
                         </SelectContent>
@@ -519,14 +580,20 @@ export default function Settings() {
 
                     <div className="space-y-2">
                       <Label htmlFor="port">SMTP Port *</Label>
-                      <Input
-                        id="port"
-                        type="number"
-                        value={smtpConfig.port}
-                        onChange={(e) => setSMTPConfig({ ...smtpConfig, port: parseInt(e.target.value) })}
-                        placeholder="587"
-                        required
-                      />
+                      <Select
+                        value={smtpConfig.port.toString()}
+                        onValueChange={(value) => handlePortChange(parseInt(value))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="587">587 (TLS - Recommended)</SelectItem>
+                          <SelectItem value="465">465 (SSL)</SelectItem>
+                          <SelectItem value="25">25 (Insecure)</SelectItem>
+                          <SelectItem value="2525">2525 (Alternative)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-2">
@@ -568,14 +635,56 @@ export default function Settings() {
                     </div>
                   </div>
 
+                  {/* Security Options */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900">Security Settings</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="useSSL"
+                          checked={smtpConfig.useSSL}
+                          onCheckedChange={(checked) => 
+                            setSMTPConfig({ 
+                              ...smtpConfig, 
+                              useSSL: checked as boolean,
+                              useTLS: !(checked as boolean) // SSL and TLS are mutually exclusive
+                            })
+                          }
+                        />
+                        <Label htmlFor="useSSL" className="text-sm">
+                          Use SSL (Port 465)
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="useTLS"
+                          checked={smtpConfig.useTLS}
+                          onCheckedChange={(checked) => 
+                            setSMTPConfig({ 
+                              ...smtpConfig, 
+                              useTLS: checked as boolean,
+                              useSSL: !(checked as boolean) // SSL and TLS are mutually exclusive
+                            })
+                          }
+                        />
+                        <Label htmlFor="useTLS" className="text-sm">
+                          Use TLS/STARTTLS (Port 587)
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Configuration Notes:</h4>
+                    <h4 className="font-medium text-blue-900 mb-2">🔒 Secure Configuration Notes:</h4>
                     <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• For Gmail: Use an App Password instead of your regular password</li>
-                      <li>• For Office 365: Use your full email address as username</li>
-                      <li>• Emails will be sent from: {smtpConfig.fromEmail}</li>
+                      <li>• <strong>Gmail:</strong> Use App Password instead of your regular password</li>
+                      <li>• <strong>Office 365:</strong> Use your full email address as username</li>
+                      <li>• <strong>Port 587 (TLS):</strong> Most secure and widely supported</li>
+                      <li>• <strong>Port 465 (SSL):</strong> Legacy SSL, still secure but less common</li>
+                      <li>• <strong>Port 25:</strong> Not recommended - no encryption</li>
+                      <li>• All emails will be sent securely from: {smtpConfig.fromEmail}</li>
                       <li>• Email notifications are sent when tickets are created or updated</li>
-                      <li>• After saving, use the 'Test Email Configuration' section to verify your settings</li>
                     </ul>
                   </div>
 
@@ -585,7 +694,7 @@ export default function Settings() {
                       disabled={configureSMTPMutation.isPending}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {configureSMTPMutation.isPending ? "Saving..." : "Save Configuration"}
+                      {configureSMTPMutation.isPending ? "Saving..." : "Save Secure Configuration"}
                     </Button>
                   </div>
                 </CardContent>
@@ -597,16 +706,16 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Send className="w-5 h-5 mr-2" />
-                  Test Email Configuration
+                  Test Secure Email Configuration
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {currentSMTPConfig?.config ? (
                   <>
                     <Alert>
-                      <CheckCircle className="h-4 w-4" />
+                      <Shield className="h-4 w-4" />
                       <AlertDescription>
-                        SMTP configuration is active. You can send a test email to verify it's working correctly.
+                        Secure SMTP configuration is active. You can send a test email to verify encryption is working correctly.
                       </AlertDescription>
                     </Alert>
                     
@@ -635,7 +744,7 @@ export default function Settings() {
                           ) : (
                             <>
                               <Send className="w-4 h-4 mr-2" />
-                              Send Test Email
+                              Send Secure Test Email
                             </>
                           )}
                         </Button>
@@ -646,7 +755,7 @@ export default function Settings() {
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      No SMTP configuration found. Please configure SMTP settings first to enable email notifications.
+                      No SMTP configuration found. Please configure secure SMTP settings first to enable email notifications.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -760,6 +869,7 @@ export default function Settings() {
                           <TableHead>Recipient</TableHead>
                           <TableHead>Action</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Security</TableHead>
                           <TableHead>Details</TableHead>
                           <TableHead>Sent At</TableHead>
                         </TableRow>
@@ -773,6 +883,14 @@ export default function Settings() {
                               <Badge variant="outline">{log.action}</Badge>
                             </TableCell>
                             <TableCell>{getStatusBadge(log.status)}</TableCell>
+                            <TableCell>
+                              {log.details?.security && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  {log.details.security}
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell className="max-w-xs">
                               {log.status === 'success' ? (
                                 <div className="text-sm text-green-600">
@@ -820,39 +938,41 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            {/* Email Integration Info */}
+            {/* Email Security Info */}
             <Card>
               <CardHeader>
-                <CardTitle>Email Monitoring & Troubleshooting</CardTitle>
+                <CardTitle className="flex items-center">
+                  <Shield className="w-5 h-5 mr-2" />
+                  Email Security & Troubleshooting
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">How to Monitor Email Delivery:</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">🔒 Security Features:</h4>
                   <div className="text-sm text-gray-700 space-y-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h5 className="font-medium text-gray-800 mb-1">Encryption Types:</h5>
+                        <ul className="list-disc list-inside space-y-1 ml-4 text-gray-600">
+                          <li><strong>SSL:</strong> Full encryption from start (Port 465)</li>
+                          <li><strong>TLS/STARTTLS:</strong> Upgrade to encryption (Port 587)</li>
+                          <li><strong>None:</strong> No encryption (Not recommended)</li>
+                        </ul>
+                      </div>
                       <div>
                         <h5 className="font-medium text-gray-800 mb-1">Success Indicators:</h5>
                         <ul className="list-disc list-inside space-y-1 ml-4 text-gray-600">
                           <li>Green "Success" badge in logs</li>
+                          <li>Security type shown in logs</li>
                           <li>Message ID present in details</li>
                           <li>Response time under 10 seconds</li>
-                          <li>High success rate percentage</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h5 className="font-medium text-gray-800 mb-1">Failure Indicators:</h5>
-                        <ul className="list-disc list-inside space-y-1 ml-4 text-gray-600">
-                          <li>Red "Failed" badge in logs</li>
-                          <li>Error message in details</li>
-                          <li>SMTP error codes (5xx, 4xx)</li>
-                          <li>Connection timeout errors</li>
                         </ul>
                       </div>
                     </div>
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
                       <p className="text-sm text-blue-800">
-                        <strong>Troubleshooting Tips:</strong> Check SMTP credentials, verify server settings, 
-                        ensure firewall allows SMTP traffic, and check recipient email validity.
+                        <strong>🔒 Security Tips:</strong> Always use TLS (Port 587) or SSL (Port 465) for secure email delivery. 
+                        For Gmail, use App Passwords instead of your regular password for enhanced security.
                       </p>
                     </div>
                   </div>

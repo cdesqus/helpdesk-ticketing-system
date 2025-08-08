@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Loader2 } from "lucide-react";
 
 export default function CreateTicket() {
   const navigate = useNavigate();
@@ -40,20 +40,32 @@ export default function CreateTicket() {
     customDate: defaultDateTime,
   });
 
-  const { data: engineersData } = useQuery({
+  const { data: engineersData, isLoading: engineersLoading } = useQuery({
     queryKey: ["engineers"],
     queryFn: () => backend.ticket.listEngineers(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => backend.ticket.create(data),
+    mutationFn: async (data: any) => {
+      console.log("Creating ticket with data:", data);
+      const result = await backend.ticket.create(data);
+      console.log("Ticket created:", result);
+      return result;
+    },
     onSuccess: (ticket) => {
+      console.log("Ticket creation successful, invalidating queries...");
+      
+      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
       queryClient.invalidateQueries({ queryKey: ["ticket-stats"] });
+      
       toast({
         title: "Ticket created",
         description: `Ticket #${ticket.id} has been created successfully.`,
       });
+      
+      // Navigate to the ticket detail page
       navigate(`/tickets/${ticket.id}`);
     },
     onError: (error: any) => {
@@ -103,6 +115,7 @@ export default function CreateTicket() {
           variant="ghost"
           onClick={() => navigate(-1)}
           className="flex items-center"
+          disabled={createMutation.isPending}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
@@ -125,6 +138,7 @@ export default function CreateTicket() {
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                   placeholder="Brief description of the issue"
                   required
+                  disabled={createMutation.isPending}
                 />
               </div>
 
@@ -135,6 +149,7 @@ export default function CreateTicket() {
                   type="datetime-local"
                   value={formData.customDate}
                   onChange={(e) => setFormData({ ...formData, customDate: e.target.value })}
+                  disabled={createMutation.isPending}
                 />
                 <p className="text-xs text-gray-500">
                   Default is set to current date and time
@@ -146,6 +161,7 @@ export default function CreateTicket() {
                 <Select
                   value={formData.status}
                   onValueChange={(value) => setFormData({ ...formData, status: value as TicketStatus })}
+                  disabled={createMutation.isPending}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -164,6 +180,7 @@ export default function CreateTicket() {
                 <Select
                   value={formData.priority}
                   onValueChange={(value) => setFormData({ ...formData, priority: value as TicketPriority })}
+                  disabled={createMutation.isPending}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -182,6 +199,7 @@ export default function CreateTicket() {
                 <Select
                   value={formData.assignedEngineer}
                   onValueChange={(value) => setFormData({ ...formData, assignedEngineer: value })}
+                  disabled={createMutation.isPending || engineersLoading}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select an engineer" />
@@ -204,6 +222,7 @@ export default function CreateTicket() {
                   value={formData.reporterName}
                   onChange={(e) => setFormData({ ...formData, reporterName: e.target.value })}
                   placeholder="Name of the person reporting the issue"
+                  disabled={createMutation.isPending}
                 />
               </div>
 
@@ -215,6 +234,7 @@ export default function CreateTicket() {
                   value={formData.reporterEmail}
                   onChange={(e) => setFormData({ ...formData, reporterEmail: e.target.value })}
                   placeholder="email@example.com"
+                  disabled={createMutation.isPending}
                 />
               </div>
 
@@ -225,6 +245,7 @@ export default function CreateTicket() {
                   value={formData.companyName}
                   onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
                   placeholder="Company or organization name"
+                  disabled={createMutation.isPending}
                 />
               </div>
             </div>
@@ -238,6 +259,7 @@ export default function CreateTicket() {
                 placeholder="Detailed description of the problem or issue"
                 rows={6}
                 required
+                disabled={createMutation.isPending}
               />
             </div>
 
@@ -246,6 +268,7 @@ export default function CreateTicket() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate(-1)}
+                disabled={createMutation.isPending}
               >
                 Cancel
               </Button>
@@ -253,8 +276,17 @@ export default function CreateTicket() {
                 type="submit"
                 disabled={createMutation.isPending}
               >
-                <Save className="w-4 h-4 mr-2" />
-                {createMutation.isPending ? "Creating..." : "Create Ticket"}
+                {createMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Create Ticket
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>

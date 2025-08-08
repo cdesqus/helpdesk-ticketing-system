@@ -84,10 +84,12 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
       const limit = req.limit || 50;
       const offset = req.offset || 0;
 
+      // Get total count
       const countQuery = `SELECT COUNT(*) as count FROM tickets ${whereClause}`;
       const countResult = await ticketDB.rawQueryRow<{ count: number }>(countQuery, ...params);
       const total = countResult?.count || 0;
 
+      // Get tickets
       const query = `
         SELECT * FROM tickets ${whereClause}
         ORDER BY created_at DESC
@@ -127,16 +129,18 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
         customDate: row.custom_date || undefined,
       }));
 
+      console.log(`Retrieved ${tickets.length} tickets for user ${auth.username} (role: ${auth.role})`);
+
       return { tickets, total };
     } catch (dbError) {
       console.error("Database error in ticket list:", dbError);
       
-      // Return dummy tickets if database fails
-      const dummyTickets: Ticket[] = [
+      // Return fallback tickets if database fails
+      const fallbackTickets: Ticket[] = [
         {
           id: 1001,
           subject: "Sample Ticket - Database Connection Issue",
-          description: "This is a sample ticket created because the database is not accessible.",
+          description: "This is a sample ticket created because the database is not accessible. The system is running in fallback mode.",
           status: "Open",
           priority: "High",
           assignedEngineer: undefined,
@@ -151,7 +155,7 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
         {
           id: 1002,
           subject: "Sample Ticket - System Setup",
-          description: "This is another sample ticket for demonstration purposes.",
+          description: "This is another sample ticket for demonstration purposes. The system is working in fallback mode.",
           status: "In Progress",
           priority: "Medium",
           assignedEngineer: "System Admin",
@@ -165,14 +169,15 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
         }
       ];
 
-      // Filter dummy tickets based on role
-      let filteredTickets = dummyTickets;
+      // Filter fallback tickets based on role
+      let filteredTickets = fallbackTickets;
       if (auth.role === "engineer") {
-        filteredTickets = dummyTickets.filter(t => t.assignedEngineer === auth.fullName);
+        filteredTickets = fallbackTickets.filter(t => t.assignedEngineer === auth.fullName);
       } else if (auth.role === "reporter") {
-        filteredTickets = dummyTickets.filter(t => t.reporterEmail === auth.email);
+        filteredTickets = fallbackTickets.filter(t => t.reporterEmail === auth.email);
       }
 
+      console.log(`Returning ${filteredTickets.length} fallback tickets due to database error`);
       return { tickets: filteredTickets, total: filteredTickets.length };
     }
   }

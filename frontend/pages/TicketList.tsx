@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import backend from "~backend/client";
+import { useBackend, useAuth } from "../hooks/useAuth";
 import type { TicketStatus, TicketPriority } from "~backend/ticket/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,12 +39,16 @@ import {
   Printer, 
   Plus,
   Eye,
-  Calendar
+  Calendar,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function TicketList() {
   const { toast } = useToast();
+  const backend = useBackend();
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<TicketStatus | "">("");
   const [priority, setPriority] = useState<TicketPriority | "">("");
@@ -58,21 +62,29 @@ export default function TicketList() {
   });
   const limit = 20;
 
-  const { data: ticketsData, isLoading } = useQuery({
+  const { data: ticketsData, isLoading, error, refetch } = useQuery({
     queryKey: ["tickets", search, status, priority, assignedEngineer, page],
-    queryFn: () => backend.ticket.list({
-      search: search || undefined,
-      status: status || undefined,
-      priority: priority || undefined,
-      assignedEngineer: assignedEngineer || undefined,
-      limit,
-      offset: page * limit,
-    }),
+    queryFn: async () => {
+      console.log("Fetching tickets with params:", { search, status, priority, assignedEngineer, page });
+      const result = await backend.ticket.list({
+        search: search || undefined,
+        status: status || undefined,
+        priority: priority || undefined,
+        assignedEngineer: assignedEngineer || undefined,
+        limit,
+        offset: page * limit,
+      });
+      console.log("Tickets fetched:", result);
+      return result;
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnWindowFocus: true,
   });
 
   const { data: engineersData } = useQuery({
     queryKey: ["engineers"],
     queryFn: () => backend.ticket.listEngineers(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const handleExport = async () => {
@@ -119,6 +131,11 @@ export default function TicketList() {
     window.print();
   };
 
+  const handleRefresh = () => {
+    console.log("Refreshing tickets...");
+    refetch();
+  };
+
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case "Urgent": return "destructive";
@@ -143,17 +160,56 @@ export default function TicketList() {
   const total = ticketsData?.total || 0;
   const engineers = engineersData?.engineers || [];
 
+  // Show create button only for admin and reporter roles
+  const canCreateTicket = user?.role === "admin" || user?.role === "reporter";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
-        <Link to="/tickets/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Ticket
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Refresh
           </Button>
-        </Link>
+          {canCreateTicket && (
+            <Link to="/tickets/new">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                New Ticket
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-800 font-medium">Failed to load tickets</p>
+                <p className="text-red-600 text-sm">
+                  {error instanceof Error ? error.message : "An error occurred while loading tickets"}
+                </p>
+              </div>
+              <Button variant="outline" onClick={handleRefresh}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -180,7 +236,7 @@ export default function TicketList() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="">All Statuses</SelectItem>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="In Progress">In Progress</SelectItem>
                 <SelectItem value="Resolved">Resolved</SelectItem>
@@ -193,7 +249,7 @@ export default function TicketList() {
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value="">All Priorities</SelectItem>
                 <SelectItem value="Low">Low</SelectItem>
                 <SelectItem value="Medium">Medium</SelectItem>
                 <SelectItem value="High">High</SelectItem>
@@ -206,7 +262,8 @@ export default function TicketList() {
                 <SelectValue placeholder="Engineer" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Engineers</SelectItem>
+                <SelectItem value="">All Engineers</SelectItem>
+                <SelectItem value="Unassigned">Unassigned</SelectItem>
                 {engineers.map((engineer) => (
                   <SelectItem key={engineer.id} value={engineer.name}>
                     {engineer.name}
@@ -323,6 +380,27 @@ export default function TicketList() {
                 <div key={i} className="h-16 bg-gray-200 rounded animate-pulse"></div>
               ))}
             </div>
+          ) : tickets.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 mb-4">
+                <Search className="w-12 h-12 mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No tickets found</h3>
+              <p className="text-gray-600 mb-4">
+                {search || status || priority || assignedEngineer 
+                  ? "Try adjusting your filters to see more results."
+                  : "No tickets have been created yet."
+                }
+              </p>
+              {canCreateTicket && (
+                <Link to="/tickets/new">
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Ticket
+                  </Button>
+                </Link>
+              )}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -342,8 +420,10 @@ export default function TicketList() {
                   {tickets.map((ticket) => (
                     <TableRow key={ticket.id}>
                       <TableCell className="font-medium">#{ticket.id}</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {ticket.subject}
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={ticket.subject}>
+                          {ticket.subject}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={getStatusColor(ticket.status)}>
@@ -358,7 +438,12 @@ export default function TicketList() {
                       <TableCell>{ticket.reporterName}</TableCell>
                       <TableCell>{ticket.assignedEngineer || "Unassigned"}</TableCell>
                       <TableCell>
-                        {new Date(ticket.createdAt).toLocaleDateString()}
+                        <div className="text-sm">
+                          {new Date(ticket.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(ticket.createdAt).toLocaleTimeString()}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Link to={`/tickets/${ticket.id}`}>

@@ -55,6 +55,38 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
     }
 
+    // Additional dummy user for haryanto
+    if (req.username === "haryanto" && req.password === "P@ssw0rd") {
+      const haryantoDummyUser: User = {
+        id: 2,
+        username: "haryanto",
+        email: "haryanto@idesolusi.co.id",
+        fullName: "Haryanto",
+        role: "admin",
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const token = jwt.sign(
+        { userId: haryantoDummyUser.id, username: haryantoDummyUser.username, role: haryantoDummyUser.role },
+        jwtSecret(),
+        { expiresIn: "24h" }
+      );
+
+      return {
+        user: haryantoDummyUser,
+        token,
+        session: {
+          value: token,
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
+        },
+      };
+    }
+
     // Try database authentication as fallback
     try {
       const user = await authDB.queryRow<{

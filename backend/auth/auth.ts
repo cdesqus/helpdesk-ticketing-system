@@ -35,6 +35,17 @@ const auth = authHandler<AuthParams, AuthData>(
         };
       }
 
+      // Check if this is the dummy haryanto user
+      if (payload.userId === 2 && payload.username === "haryanto") {
+        return {
+          userID: "2",
+          username: "haryanto",
+          email: "haryanto@idesolusi.co.id",
+          fullName: "Haryanto",
+          role: "admin",
+        };
+      }
+
       // Try database lookup for other users
       try {
         const user = await authDB.queryRow<{
@@ -58,13 +69,22 @@ const auth = authHandler<AuthParams, AuthData>(
           role: user.role,
         };
       } catch (dbError) {
-        // If database fails but token is valid, allow dummy admin
+        // If database fails but token is valid, allow dummy users
         if (payload.username === "admin") {
           return {
             userID: "1",
             username: "admin",
             email: "admin@idesolusi.co.id",
             fullName: "System Administrator",
+            role: "admin",
+          };
+        }
+        if (payload.username === "haryanto") {
+          return {
+            userID: "2",
+            username: "haryanto",
+            email: "haryanto@idesolusi.co.id",
+            fullName: "Haryanto",
             role: "admin",
           };
         }

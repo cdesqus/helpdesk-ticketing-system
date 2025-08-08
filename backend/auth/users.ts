@@ -119,7 +119,7 @@ export const listUsers = api<void, ListUsersResponse>(
         updatedAt: row.updated_at,
       }));
 
-      // Add dummy admin user if database is empty or not accessible
+      // Add dummy users if database is empty or not accessible
       if (users.length === 0 || !users.find(u => u.username === "admin")) {
         users.unshift({
           id: 1,
@@ -133,21 +133,46 @@ export const listUsers = api<void, ListUsersResponse>(
         });
       }
 
-      return { users };
-    } catch (dbError) {
-      console.error("Database error in listUsers:", dbError);
-      // Return dummy admin user if database fails
-      return {
-        users: [{
-          id: 1,
-          username: "admin",
-          email: "admin@idesolusi.co.id",
-          fullName: "System Administrator",
+      if (!users.find(u => u.username === "haryanto")) {
+        users.unshift({
+          id: 2,
+          username: "haryanto",
+          email: "haryanto@idesolusi.co.id",
+          fullName: "Haryanto",
           role: "admin",
           status: "active",
           createdAt: new Date(),
           updatedAt: new Date(),
-        }]
+        });
+      }
+
+      return { users };
+    } catch (dbError) {
+      console.error("Database error in listUsers:", dbError);
+      // Return dummy users if database fails
+      return {
+        users: [
+          {
+            id: 1,
+            username: "admin",
+            email: "admin@idesolusi.co.id",
+            fullName: "System Administrator",
+            role: "admin",
+            status: "active",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: 2,
+            username: "haryanto",
+            email: "haryanto@idesolusi.co.id",
+            fullName: "Haryanto",
+            role: "admin",
+            status: "active",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }
+        ]
       };
     }
   }
@@ -162,8 +187,8 @@ export const updateUser = api<UpdateUserRequest, User>(
       throw APIError.permissionDenied("only admins can update users");
     }
 
-    // Don't allow updating the dummy admin user
-    if (req.id === 1) {
+    // Don't allow updating the dummy admin users
+    if (req.id === 1 || req.id === 2) {
       throw APIError.invalidArgument("cannot update system administrator");
     }
 
@@ -268,8 +293,8 @@ export const changePassword = api<ChangePasswordRequest, void>(
       throw APIError.permissionDenied("only admins can change passwords");
     }
 
-    // Don't allow changing dummy admin password
-    if (req.id === 1) {
+    // Don't allow changing dummy admin passwords
+    if (req.id === 1 || req.id === 2) {
       throw APIError.invalidArgument("cannot change system administrator password");
     }
 
@@ -301,6 +326,20 @@ export const getCurrentUser = api<void, User>(
         username: "admin",
         email: "admin@idesolusi.co.id",
         fullName: "System Administrator",
+        role: "admin",
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
+    // Return dummy haryanto user
+    if (auth.userID === "2" && auth.username === "haryanto") {
+      return {
+        id: 2,
+        username: "haryanto",
+        email: "haryanto@idesolusi.co.id",
+        fullName: "Haryanto",
         role: "admin",
         status: "active",
         createdAt: new Date(),

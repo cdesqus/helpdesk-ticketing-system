@@ -24,6 +24,17 @@ export interface Engineer {
   createdAt: Date;
 }
 
+export interface TicketComment {
+  id: number;
+  ticketId: number;
+  authorName: string;
+  authorEmail?: string;
+  content: string;
+  isInternal: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface TicketStats {
   total: number;
   open: number;

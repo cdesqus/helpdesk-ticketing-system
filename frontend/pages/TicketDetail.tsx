@@ -16,7 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import CommentSection from "../components/CommentSection";
 import { 
   ArrowLeft, 
   Edit, 
@@ -25,7 +35,9 @@ import {
   Calendar,
   User,
   Building,
-  Mail
+  Mail,
+  Trash2,
+  XCircle
 } from "lucide-react";
 
 export default function TicketDetail() {
@@ -34,6 +46,8 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
+  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     subject: "",
     description: "",
@@ -74,6 +88,52 @@ export default function TicketDetail() {
       toast({
         title: "Error",
         description: "Failed to update ticket. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => backend.ticket.deleteTicket({ id: parseInt(id!) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-stats"] });
+      toast({
+        title: "Ticket deleted",
+        description: "Ticket has been deleted successfully.",
+      });
+      navigate("/tickets");
+    },
+    onError: (error) => {
+      console.error("Failed to delete ticket:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete ticket. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: (data: { id: number; reason?: string }) => 
+      backend.ticket.closeTicket(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket", id] });
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["comments", parseInt(id!)] });
+      setIsCloseDialogOpen(false);
+      setCloseReason("");
+      toast({
+        title: "Ticket closed",
+        description: "Ticket has been closed successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to close ticket:", error);
+      toast({
+        title: "Error",
+        description: "Failed to close ticket. Please try again.",
         variant: "destructive",
       });
     },
@@ -139,6 +199,19 @@ export default function TicketDetail() {
     };
 
     updateMutation.mutate(updateData);
+  };
+
+  const handleDelete = () => {
+    if (confirm("Are you sure you want to delete this ticket? This action cannot be undone.")) {
+      deleteMutation.mutate();
+    }
+  };
+
+  const handleClose = () => {
+    closeMutation.mutate({
+      id: parseInt(id!),
+      reason: closeReason || undefined,
+    });
   };
 
   const getPriorityColor = (priority: TicketPriority) => {
@@ -217,10 +290,60 @@ export default function TicketDetail() {
         
         <div className="flex items-center space-x-2">
           {!isEditing ? (
-            <Button onClick={handleEdit}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
+            <>
+              <Button onClick={handleEdit}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+              {ticket.status !== "Closed" && (
+                <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Close
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Close Ticket</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to close this ticket? You can optionally provide a reason.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="closeReason">Closing Reason (Optional)</Label>
+                        <Textarea
+                          id="closeReason"
+                          value={closeReason}
+                          onChange={(e) => setCloseReason(e.target.value)}
+                          placeholder="Provide a reason for closing this ticket..."
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsCloseDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleClose}
+                        disabled={closeMutation.isPending}
+                      >
+                        {closeMutation.isPending ? "Closing..." : "Close Ticket"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+              <Button variant="destructive" onClick={handleDelete}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </>
           ) : (
             <>
               <Button variant="outline" onClick={handleCancel}>
@@ -277,6 +400,9 @@ export default function TicketDetail() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Comments Section */}
+          <CommentSection ticketId={ticket.id} />
         </div>
 
         {/* Sidebar */}

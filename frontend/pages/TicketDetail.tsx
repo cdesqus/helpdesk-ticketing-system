@@ -53,7 +53,7 @@ export default function TicketDetail() {
     description: "",
     status: "Open" as TicketStatus,
     priority: "Medium" as TicketPriority,
-    assignedEngineer: "",
+    assignedEngineer: "unassigned",
     reporterName: "",
     reporterEmail: "",
     companyName: "",

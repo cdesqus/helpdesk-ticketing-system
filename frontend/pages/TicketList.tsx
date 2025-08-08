@@ -51,9 +51,9 @@ export default function TicketList() {
   const backend = useBackend();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<TicketStatus | "">("");
-  const [priority, setPriority] = useState<TicketPriority | "">("");
-  const [assignedEngineer, setAssignedEngineer] = useState("");
+  const [status, setStatus] = useState<TicketStatus | "all">("all");
+  const [priority, setPriority] = useState<TicketPriority | "all">("all");
+  const [assignedEngineer, setAssignedEngineer] = useState("all");
   const [page, setPage] = useState(0);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"excel" | "pdf">("excel");
@@ -70,9 +70,9 @@ export default function TicketList() {
       try {
         const result = await backend.ticket.list({
           search: search || undefined,
-          status: status || undefined,
-          priority: priority || undefined,
-          assignedEngineer: assignedEngineer || undefined,
+          status: status === "all" ? undefined : status,
+          priority: priority === "all" ? undefined : priority,
+          assignedEngineer: assignedEngineer === "all" ? undefined : (assignedEngineer === "unassigned" ? "Unassigned" : assignedEngineer),
           limit,
           offset: page * limit,
         });
@@ -100,9 +100,9 @@ export default function TicketList() {
       const response = await backend.ticket.exportTickets({
         format: exportFormat,
         search: search || undefined,
-        status: status || undefined,
-        priority: priority || undefined,
-        assignedEngineer: assignedEngineer || undefined,
+        status: status === "all" ? undefined : status,
+        priority: priority === "all" ? undefined : priority,
+        assignedEngineer: assignedEngineer === "all" ? undefined : (assignedEngineer === "unassigned" ? "Unassigned" : assignedEngineer),
         startDate: exportDateRange.startDate || undefined,
         endDate: exportDateRange.endDate || undefined,
       });
@@ -270,12 +270,12 @@ export default function TicketList() {
               />
             </div>
             
-            <Select value={status} onValueChange={(value) => setStatus(value as TicketStatus | "")}>
+            <Select value={status} onValueChange={(value) => setStatus(value as TicketStatus | "all")}>
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="In Progress">In Progress</SelectItem>
                 <SelectItem value="Resolved">Resolved</SelectItem>
@@ -283,12 +283,12 @@ export default function TicketList() {
               </SelectContent>
             </Select>
 
-            <Select value={priority} onValueChange={(value) => setPriority(value as TicketPriority | "")}>
+            <Select value={priority} onValueChange={(value) => setPriority(value as TicketPriority | "all")}>
               <SelectTrigger>
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Priorities</SelectItem>
+                <SelectItem value="all">All Priorities</SelectItem>
                 <SelectItem value="Low">Low</SelectItem>
                 <SelectItem value="Medium">Medium</SelectItem>
                 <SelectItem value="High">High</SelectItem>
@@ -301,8 +301,8 @@ export default function TicketList() {
                 <SelectValue placeholder="Engineer" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Engineers</SelectItem>
-                <SelectItem value="Unassigned">Unassigned</SelectItem>
+                <SelectItem value="all">All Engineers</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
                 {engineers.map((engineer) => (
                   <SelectItem key={engineer.id} value={engineer.name}>
                     {engineer.name}
@@ -430,7 +430,7 @@ export default function TicketList() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No tickets found</h3>
               <p className="text-gray-600 mb-4">
-                {search || status || priority || assignedEngineer 
+                {search || status !== "all" || priority !== "all" || assignedEngineer !== "all"
                   ? "Try adjusting your filters to see more results."
                   : "No tickets have been created yet."
                 }

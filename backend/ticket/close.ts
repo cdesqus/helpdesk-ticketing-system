@@ -6,10 +6,10 @@ import { sendTicketNotification } from "./email";
 
 export interface CloseTicketRequest {
   id: number;
-  reason?: string;
+  resolution?: string;
 }
 
-// Closes a ticket and optionally adds a closing comment.
+// Closes a ticket and sets the resolution.
 export const closeTicket = api<CloseTicketRequest, Ticket>(
   { auth: true, expose: true, method: "POST", path: "/tickets/:id/close" },
   async (req) => {
@@ -40,7 +40,7 @@ export const closeTicket = api<CloseTicketRequest, Ticket>(
 
     const now = new Date();
 
-    // Update ticket status to Closed
+    // Update ticket status to Closed and set resolution
     const row = await ticketDB.queryRow<{
       id: number;
       subject: string;
@@ -51,30 +51,23 @@ export const closeTicket = api<CloseTicketRequest, Ticket>(
       reporter_name: string;
       reporter_email: string | null;
       company_name: string | null;
+      resolution: string | null;
       created_at: Date;
       updated_at: Date;
       resolved_at: Date | null;
       custom_date: Date | null;
     }>`
       UPDATE tickets 
-      SET status = 'Closed', resolved_at = ${now}, updated_at = ${now}
+      SET status = 'Closed', 
+          resolved_at = ${now}, 
+          updated_at = ${now},
+          resolution = ${req.resolution || null}
       WHERE id = ${req.id}
       RETURNING *
     `;
 
     if (!row) {
       throw APIError.notFound("ticket not found");
-    }
-
-    // Add closing comment if reason provided
-    if (req.reason) {
-      await ticketDB.exec`
-        INSERT INTO ticket_comments (
-          ticket_id, author_name, content, is_internal, created_at, updated_at
-        ) VALUES (
-          ${req.id}, ${auth.fullName}, ${`Ticket closed. Reason: ${req.reason}`}, false, ${now}, ${now}
-        )
-      `;
     }
 
     const ticket: Ticket = {
@@ -87,6 +80,7 @@ export const closeTicket = api<CloseTicketRequest, Ticket>(
       reporterName: row.reporter_name,
       reporterEmail: row.reporter_email || undefined,
       companyName: row.company_name || undefined,
+      resolution: row.resolution || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       resolvedAt: row.resolved_at || undefined,

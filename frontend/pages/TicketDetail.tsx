@@ -51,7 +51,7 @@ export default function TicketDetail() {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
-  const [closeReason, setCloseReason] = useState("");
+  const [resolution, setResolution] = useState("");
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     subject: "",
@@ -147,7 +147,7 @@ export default function TicketDetail() {
   });
 
   const closeMutation = useMutation({
-    mutationFn: (data: { id: number; reason?: string }) => 
+    mutationFn: (data: { id: number; resolution?: string }) => 
       backend.ticket.closeTicket(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ticket", id] });
@@ -155,7 +155,7 @@ export default function TicketDetail() {
       queryClient.invalidateQueries({ queryKey: ["ticket-stats"] });
       queryClient.invalidateQueries({ queryKey: ["comments", parseInt(id!)] });
       setIsCloseDialogOpen(false);
-      setCloseReason("");
+      setResolution("");
       toast({
         title: "Ticket closed",
         description: "Ticket has been closed successfully.",
@@ -261,7 +261,7 @@ export default function TicketDetail() {
   const handleClose = () => {
     closeMutation.mutate({
       id: parseInt(id!),
-      reason: closeReason || undefined,
+      resolution: resolution || undefined,
     });
   };
 
@@ -424,17 +424,17 @@ export default function TicketDetail() {
                     <DialogHeader>
                       <DialogTitle>Close Ticket</DialogTitle>
                       <DialogDescription>
-                        Are you sure you want to close this ticket? You can optionally provide a reason.
+                        Are you sure you want to close this ticket? You can provide a resolution.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="closeReason">Closing Reason (Optional)</Label>
+                        <Label htmlFor="resolution">Resolution</Label>
                         <Textarea
-                          id="closeReason"
-                          value={closeReason}
-                          onChange={(e) => setCloseReason(e.target.value)}
-                          placeholder="Provide a reason for closing this ticket..."
+                          id="resolution"
+                          value={resolution}
+                          onChange={(e) => setResolution(e.target.value)}
+                          placeholder="Provide the resolution for this ticket..."
                           rows={3}
                         />
                       </div>

@@ -279,13 +279,19 @@ import {
 } from "~backend/ticket/comments";
 import { create as api_ticket_create_create } from "~backend/ticket/create";
 import { deleteTicket as api_ticket_delete_deleteTicket } from "~backend/ticket/delete";
+import {
+    clearOldEmailLogs as api_ticket_email_logs_clearOldEmailLogs,
+    getEmailStats as api_ticket_email_logs_getEmailStats,
+    listEmailLogs as api_ticket_email_logs_listEmailLogs
+} from "~backend/ticket/email-logs";
 import { listEngineers as api_ticket_engineers_listEngineers } from "~backend/ticket/engineers";
 import { exportTickets as api_ticket_export_exportTickets } from "~backend/ticket/export";
 import { get as api_ticket_get_get } from "~backend/ticket/get";
 import { list as api_ticket_list_list } from "~backend/ticket/list";
 import {
     configureSMTP as api_ticket_smtp_configureSMTP,
-    getSMTPConfig as api_ticket_smtp_getSMTPConfig
+    getSMTPConfig as api_ticket_smtp_getSMTPConfig,
+    testSMTP as api_ticket_smtp_testSMTP
 } from "~backend/ticket/smtp";
 import { getStats as api_ticket_stats_getStats } from "~backend/ticket/stats";
 import {
@@ -303,6 +309,7 @@ export namespace ticket {
             this.baseClient = baseClient
             this.addComment = this.addComment.bind(this)
             this.bulkDeleteTickets = this.bulkDeleteTickets.bind(this)
+            this.clearOldEmailLogs = this.clearOldEmailLogs.bind(this)
             this.closeTicket = this.closeTicket.bind(this)
             this.configureSMTP = this.configureSMTP.bind(this)
             this.create = this.create.bind(this)
@@ -310,12 +317,15 @@ export namespace ticket {
             this.deleteTicket = this.deleteTicket.bind(this)
             this.exportTickets = this.exportTickets.bind(this)
             this.get = this.get.bind(this)
+            this.getEmailStats = this.getEmailStats.bind(this)
             this.getSMTPConfig = this.getSMTPConfig.bind(this)
             this.getStats = this.getStats.bind(this)
             this.getSystemConfig = this.getSystemConfig.bind(this)
             this.list = this.list.bind(this)
             this.listComments = this.listComments.bind(this)
+            this.listEmailLogs = this.listEmailLogs.bind(this)
             this.listEngineers = this.listEngineers.bind(this)
+            this.testSMTP = this.testSMTP.bind(this)
             this.update = this.update.bind(this)
             this.updateComment = this.updateComment.bind(this)
             this.updateSystemConfig = this.updateSystemConfig.bind(this)
@@ -348,6 +358,20 @@ export namespace ticket {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/tickets/bulk`, {query, method: "DELETE", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_bulk_delete_bulkDeleteTickets>
+        }
+
+        /**
+         * Clears old email logs (admin only).
+         */
+        public async clearOldEmailLogs(params: RequestType<typeof api_ticket_email_logs_clearOldEmailLogs>): Promise<ResponseType<typeof api_ticket_email_logs_clearOldEmailLogs>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                daysOld: String(params.daysOld),
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/email-logs/cleanup`, {query, method: "DELETE", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_email_logs_clearOldEmailLogs>
         }
 
         /**
@@ -426,6 +450,15 @@ export namespace ticket {
         }
 
         /**
+         * Retrieves email delivery statistics (admin only).
+         */
+        public async getEmailStats(): Promise<ResponseType<typeof api_ticket_email_logs_getEmailStats>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/email-stats`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_email_logs_getEmailStats>
+        }
+
+        /**
          * Retrieves current SMTP configuration.
          */
         public async getSMTPConfig(): Promise<ResponseType<typeof api_ticket_smtp_getSMTPConfig>> {
@@ -483,12 +516,38 @@ export namespace ticket {
         }
 
         /**
+         * Retrieves email delivery logs (admin only).
+         */
+        public async listEmailLogs(params: RequestType<typeof api_ticket_email_logs_listEmailLogs>): Promise<ResponseType<typeof api_ticket_email_logs_listEmailLogs>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                limit:    params.limit === undefined ? undefined : String(params.limit),
+                offset:   params.offset === undefined ? undefined : String(params.offset),
+                status:   params.status === undefined ? undefined : String(params.status),
+                ticketId: params.ticketId === undefined ? undefined : String(params.ticketId),
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/email-logs`, {query, method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_email_logs_listEmailLogs>
+        }
+
+        /**
          * Retrieves all engineers from the auth system.
          */
         public async listEngineers(): Promise<ResponseType<typeof api_ticket_engineers_listEngineers>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/engineers`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_engineers_listEngineers>
+        }
+
+        /**
+         * Tests SMTP configuration.
+         */
+        public async testSMTP(params: RequestType<typeof api_ticket_smtp_testSMTP>): Promise<ResponseType<typeof api_ticket_smtp_testSMTP>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/smtp/test`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_smtp_testSMTP>
         }
 
         /**

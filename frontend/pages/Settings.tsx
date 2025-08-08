@@ -13,9 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import SystemLogo from "../components/SystemLogo";
-import { Save, Mail, Settings as SettingsIcon, Palette, Upload } from "lucide-react";
+import { Save, Mail, Settings as SettingsIcon, Palette, Upload, Send, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -39,6 +40,8 @@ export default function Settings() {
     secondaryColor: "#1e40af",
   });
 
+  const [testEmail, setTestEmail] = useState("");
+
   const { data: currentSMTPConfig, isLoading: smtpLoading } = useQuery({
     queryKey: ["smtp-config"],
     queryFn: () => backend.ticket.getSMTPConfig(),
@@ -55,14 +58,40 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["smtp-config"] });
       toast({
         title: "SMTP configured",
-        description: "Email settings have been saved successfully.",
+        description: "Email settings have been saved and tested successfully.",
       });
     },
     onError: (error: any) => {
       console.error("Failed to configure SMTP:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save email settings. Please try again.",
+        description: error.message || "Failed to save email settings. Please check your configuration.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testSMTPMutation = useMutation({
+    mutationFn: (data: { testEmail: string }) => backend.ticket.testSMTP(data),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast({
+          title: "Test email sent",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Test failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error("Failed to test SMTP:", error);
+      toast({
+        title: "Test failed",
+        description: error.message || "Failed to send test email.",
         variant: "destructive",
       });
     },
@@ -154,6 +183,28 @@ export default function Settings() {
     }
 
     configureSMTPMutation.mutate(smtpConfig);
+  };
+
+  const handleTestSMTP = () => {
+    if (!testEmail.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a test email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!currentSMTPConfig?.config) {
+      toast({
+        title: "Configuration Required",
+        description: "Please save SMTP configuration first before testing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    testSMTPMutation.mutate({ testEmail });
   };
 
   const handleSystemConfigSubmit = (e: React.FormEvent) => {
@@ -335,138 +386,216 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="email">
-          <form onSubmit={handleSMTPSubmit}>
+          <div className="space-y-6">
+            <form onSubmit={handleSMTPSubmit}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Mail className="w-5 h-5 mr-2" />
+                    SMTP Email Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="provider">Email Provider *</Label>
+                      <Select
+                        value={smtpConfig.provider}
+                        onValueChange={handleProviderChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select email provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gmail">Gmail</SelectItem>
+                          <SelectItem value="office365">Office 365</SelectItem>
+                          <SelectItem value="custom">Custom SMTP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="fromEmail">From Email *</Label>
+                      <Input
+                        id="fromEmail"
+                        type="email"
+                        value={smtpConfig.fromEmail}
+                        onChange={(e) => setSMTPConfig({ ...smtpConfig, fromEmail: e.target.value })}
+                        placeholder="helpdesk@idesolusi.co.id"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="host">SMTP Host *</Label>
+                      <Input
+                        id="host"
+                        value={smtpConfig.host}
+                        onChange={(e) => setSMTPConfig({ ...smtpConfig, host: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="port">SMTP Port *</Label>
+                      <Input
+                        id="port"
+                        type="number"
+                        value={smtpConfig.port}
+                        onChange={(e) => setSMTPConfig({ ...smtpConfig, port: parseInt(e.target.value) })}
+                        placeholder="587"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Username *</Label>
+                      <Input
+                        id="username"
+                        value={smtpConfig.username}
+                        onChange={(e) => setSMTPConfig({ ...smtpConfig, username: e.target.value })}
+                        placeholder="your-email@gmail.com"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password *</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={smtpConfig.password}
+                        onChange={(e) => setSMTPConfig({ ...smtpConfig, password: e.target.value })}
+                        placeholder="Your email password or app password"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Configuration Notes:</h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• For Gmail: Use an App Password instead of your regular password</li>
+                      <li>• For Office 365: Use your full email address as username</li>
+                      <li>• Emails will be sent from: {smtpConfig.fromEmail}</li>
+                      <li>• Email notifications are sent when tickets are created or updated</li>
+                      <li>• Configuration will be tested automatically when saved</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={configureSMTPMutation.isPending}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {configureSMTPMutation.isPending ? "Saving & Testing..." : "Save & Test Configuration"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </form>
+
+            {/* Test Email Section */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Mail className="w-5 h-5 mr-2" />
-                  SMTP Email Configuration
+                  <Send className="w-5 h-5 mr-2" />
+                  Test Email Configuration
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="provider">Email Provider *</Label>
-                    <Select
-                      value={smtpConfig.provider}
-                      onValueChange={handleProviderChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select email provider" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="gmail">Gmail</SelectItem>
-                        <SelectItem value="office365">Office 365</SelectItem>
-                        <SelectItem value="custom">Custom SMTP</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <CardContent className="space-y-4">
+                {currentSMTPConfig?.config ? (
+                  <>
+                    <Alert>
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        SMTP configuration is active. You can send a test email to verify it's working correctly.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="flex space-x-4">
+                      <div className="flex-1">
+                        <Label htmlFor="testEmail">Test Email Address</Label>
+                        <Input
+                          id="testEmail"
+                          type="email"
+                          value={testEmail}
+                          onChange={(e) => setTestEmail(e.target.value)}
+                          placeholder="test@example.com"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          onClick={handleTestSMTP}
+                          disabled={testSMTPMutation.isPending}
+                          variant="outline"
+                        >
+                          {testSMTPMutation.isPending ? (
+                            <>
+                              <Send className="w-4 h-4 mr-2 animate-pulse" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4 mr-2" />
+                              Send Test Email
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      No SMTP configuration found. Please configure SMTP settings first to enable email notifications.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Email Integration Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Email Notification Features</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Automatic Email Notifications:</h4>
+                  <div className="text-sm text-gray-700 space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h5 className="font-medium text-gray-800 mb-1">When tickets are created:</h5>
+                        <ul className="list-disc list-inside space-y-1 ml-4 text-gray-600">
+                          <li>Reporter receives confirmation email</li>
+                          <li>Email includes ticket details and ID</li>
+                          <li>Instructions for tracking progress</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-gray-800 mb-1">When tickets are updated:</h5>
+                        <ul className="list-disc list-inside space-y-1 ml-4 text-gray-600">
+                          <li>Reporter receives update notification</li>
+                          <li>Status and priority changes included</li>
+                          <li>Engineer assignment notifications</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> Email notifications are only sent to reporters who have provided an email address. 
+                        Engineers and admins can configure their own notification preferences.
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="fromEmail">From Email *</Label>
-                    <Input
-                      id="fromEmail"
-                      type="email"
-                      value={smtpConfig.fromEmail}
-                      onChange={(e) => setSMTPConfig({ ...smtpConfig, fromEmail: e.target.value })}
-                      placeholder="helpdesk@idesolusi.co.id"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="host">SMTP Host *</Label>
-                    <Input
-                      id="host"
-                      value={smtpConfig.host}
-                      onChange={(e) => setSMTPConfig({ ...smtpConfig, host: e.target.value })}
-                      placeholder="smtp.gmail.com"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="port">SMTP Port *</Label>
-                    <Input
-                      id="port"
-                      type="number"
-                      value={smtpConfig.port}
-                      onChange={(e) => setSMTPConfig({ ...smtpConfig, port: parseInt(e.target.value) })}
-                      placeholder="587"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username *</Label>
-                    <Input
-                      id="username"
-                      value={smtpConfig.username}
-                      onChange={(e) => setSMTPConfig({ ...smtpConfig, username: e.target.value })}
-                      placeholder="your-email@gmail.com"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password *</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={smtpConfig.password}
-                      onChange={(e) => setSMTPConfig({ ...smtpConfig, password: e.target.value })}
-                      placeholder="Your email password or app password"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">Configuration Notes:</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• For Gmail: Use an App Password instead of your regular password</li>
-                    <li>• For Office 365: Use your full email address as username</li>
-                    <li>• Emails will be sent from: {smtpConfig.fromEmail}</li>
-                    <li>• Email notifications are sent when tickets are created or updated</li>
-                  </ul>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    disabled={configureSMTPMutation.isPending}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {configureSMTPMutation.isPending ? "Saving..." : "Save Configuration"}
-                  </Button>
                 </div>
               </CardContent>
             </Card>
-          </form>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Email-to-Ticket Integration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                <h4 className="font-medium text-gray-900 mb-2">Email Integration Setup:</h4>
-                <div className="text-sm text-gray-700 space-y-2">
-                  <p>To enable email-to-ticket automation for <strong>helpdesk@idesolusi.co.id</strong>:</p>
-                  <ol className="list-decimal list-inside space-y-1 ml-4">
-                    <li>Configure your email server to forward incoming emails to this system</li>
-                    <li>Set up email parsing rules to extract ticket information</li>
-                    <li>Ensure the SMTP configuration above is properly set</li>
-                    <li>Test the integration by sending an email to helpdesk@idesolusi.co.id</li>
-                  </ol>
-                  <p className="mt-3 text-xs text-gray-600">
-                    Note: Email-to-ticket functionality requires additional server-side configuration 
-                    and email parsing implementation.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

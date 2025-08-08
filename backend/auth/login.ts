@@ -79,9 +79,9 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours from now
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
       
-      // Store session with 8-hour expiration
+      // Store session with 24-hour expiration
       activeSessions.set(token, {
         userId: dummyUser.id,
         username: dummyUser.username,
@@ -98,7 +98,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 8 hours
+          expires: expiresAt, // Set cookie expiration to 24 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -121,9 +121,9 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours from now
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
       
-      // Store session with 8-hour expiration
+      // Store session with 24-hour expiration
       activeSessions.set(token, {
         userId: haryantoDummyUser.id,
         username: haryantoDummyUser.username,
@@ -140,7 +140,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 8 hours
+          expires: expiresAt, // Set cookie expiration to 24 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -180,9 +180,9 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
 
       const token = generateSessionToken();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours from now
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
       
-      // Store session with 8-hour expiration
+      // Store session with 24-hour expiration
       activeSessions.set(token, {
         userId: user.id,
         username: user.username,
@@ -210,7 +210,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 8 hours
+          expires: expiresAt, // Set cookie expiration to 24 hours
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -244,10 +244,12 @@ export function getSession(token: string) {
     return null;
   }
   
-  // Update last accessed time to extend session activity
+  // Update last accessed time and extend session by another 24 hours on each access
+  const newExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   session.lastAccessed = now;
+  session.expiresAt = newExpiresAt;
   
-  console.log("getSession: Valid session found for token:", token.substring(0, 8) + "...", "expires at:", session.expiresAt.toISOString());
+  console.log("getSession: Valid session found for token:", token.substring(0, 8) + "...", "extended expires at:", session.expiresAt.toISOString());
   return session;
 }
 
@@ -304,8 +306,8 @@ export const refreshSession = api<void, { message: string; expiresAt: Date }>(
       throw APIError.unauthenticated("session has expired");
     }
 
-    // Extend session by another 8 hours
-    const newExpiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    // Extend session by another 24 hours
+    const newExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     session.expiresAt = newExpiresAt;
     session.lastAccessed = now;
 

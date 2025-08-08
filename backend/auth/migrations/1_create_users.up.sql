@@ -27,4 +27,4 @@ CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens(expir
 -- Insert default admin user (password: admin123)
 -- Hash generated with: bcrypt.hash('admin123', 10)
 INSERT INTO users (username, password_hash, email, full_name, role) VALUES 
-  ('admin', '$2b$10$rOzJqQZQZQZQZQZQZQZQZOzJqQZQZQZQZQZQZQZQZOzJqQZQZQZQZQ', 'admin@idesolusi.co.id', 'System Administrator', 'admin');
+  ('admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@idesolusi.co.id', 'System Administrator', 'admin');

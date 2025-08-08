@@ -38,14 +38,15 @@ export const getStats = api<void, GetStatsResponse>(
       console.log(`Stats query where clause: ${whereClause}`);
       console.log(`Stats query params:`, params);
 
-      // Get overall stats
+      // Get overall stats including monthly count
       const statsQuery = `
         SELECT 
           COUNT(*) as total,
           COUNT(CASE WHEN status = 'Open' THEN 1 END) as open,
           COUNT(CASE WHEN status = 'In Progress' THEN 1 END) as in_progress,
           COUNT(CASE WHEN status = 'Resolved' THEN 1 END) as resolved,
-          COUNT(CASE WHEN status = 'Closed' THEN 1 END) as closed
+          COUNT(CASE WHEN status = 'Closed' THEN 1 END) as closed,
+          COUNT(CASE WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE) THEN 1 END) as monthly
         FROM tickets ${whereClause}
       `;
 
@@ -55,6 +56,7 @@ export const getStats = api<void, GetStatsResponse>(
         in_progress: number;
         resolved: number;
         closed: number;
+        monthly: number;
       }>(statsQuery, ...params);
 
       const stats: TicketStats = {
@@ -63,6 +65,7 @@ export const getStats = api<void, GetStatsResponse>(
         inProgress: statsRow?.in_progress || 0,
         resolved: statsRow?.resolved || 0,
         closed: statsRow?.closed || 0,
+        monthly: statsRow?.monthly || 0,
       };
 
       console.log(`Stats calculated:`, stats);
@@ -125,6 +128,7 @@ export const getStats = api<void, GetStatsResponse>(
         inProgress: 1,
         resolved: 0,
         closed: 0,
+        monthly: 2,
       };
 
       const fallbackTrends: TicketTrend[] = [

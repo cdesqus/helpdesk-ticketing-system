@@ -14,6 +14,7 @@ export interface UpdateTicketRequest {
   reporterName?: string;
   reporterEmail?: string;
   companyName?: string;
+  resolution?: string;
   customDate?: Date;
 }
 
@@ -40,12 +41,12 @@ export const update = api<UpdateTicketRequest, Ticket>(
       if (existingTicket.assigned_engineer !== auth.fullName) {
         throw APIError.permissionDenied("you can only update tickets assigned to you");
       }
-      // Engineers can only update status and add comments (handled in comments endpoint)
+      // Engineers can only update status, resolution and add comments (handled in comments endpoint)
       if (req.subject !== undefined || req.description !== undefined || 
           req.assignedEngineer !== undefined || req.reporterName !== undefined ||
           req.reporterEmail !== undefined || req.companyName !== undefined ||
           req.customDate !== undefined || req.priority !== undefined) {
-        throw APIError.permissionDenied("engineers can only update ticket status");
+        throw APIError.permissionDenied("engineers can only update ticket status and resolution");
       }
     } else if (auth.role === "reporter") {
       // Reporters cannot update tickets
@@ -113,6 +114,12 @@ export const update = api<UpdateTicketRequest, Ticket>(
       paramIndex++;
     }
 
+    if (req.resolution !== undefined) {
+      updates.push(`resolution = $${paramIndex}`);
+      params.push(req.resolution || null);
+      paramIndex++;
+    }
+
     if (req.customDate !== undefined) {
       updates.push(`custom_date = $${paramIndex}`);
       params.push(req.customDate);
@@ -140,6 +147,7 @@ export const update = api<UpdateTicketRequest, Ticket>(
       reporter_name: string;
       reporter_email: string | null;
       company_name: string | null;
+      resolution: string | null;
       created_at: Date;
       updated_at: Date;
       resolved_at: Date | null;
@@ -160,6 +168,7 @@ export const update = api<UpdateTicketRequest, Ticket>(
       reporterName: row.reporter_name,
       reporterEmail: row.reporter_email || undefined,
       companyName: row.company_name || undefined,
+      resolution: row.resolution || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       resolvedAt: row.resolved_at || undefined,

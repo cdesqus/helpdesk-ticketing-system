@@ -270,6 +270,10 @@ export namespace auth {
  * Import the endpoint handlers to derive the types for the client.
  */
 import { bulkDeleteTickets as api_ticket_bulk_delete_bulkDeleteTickets } from "~backend/ticket/bulk-delete";
+import {
+    bulkImportTickets as api_ticket_bulk_import_bulkImportTickets,
+    generateImportTemplate as api_ticket_bulk_import_generateImportTemplate
+} from "~backend/ticket/bulk-import";
 import { closeTicket as api_ticket_close_closeTicket } from "~backend/ticket/close";
 import {
     addComment as api_ticket_comments_addComment,
@@ -309,6 +313,7 @@ export namespace ticket {
             this.baseClient = baseClient
             this.addComment = this.addComment.bind(this)
             this.bulkDeleteTickets = this.bulkDeleteTickets.bind(this)
+            this.bulkImportTickets = this.bulkImportTickets.bind(this)
             this.clearOldEmailLogs = this.clearOldEmailLogs.bind(this)
             this.closeTicket = this.closeTicket.bind(this)
             this.configureSMTP = this.configureSMTP.bind(this)
@@ -316,6 +321,7 @@ export namespace ticket {
             this.deleteComment = this.deleteComment.bind(this)
             this.deleteTicket = this.deleteTicket.bind(this)
             this.exportTickets = this.exportTickets.bind(this)
+            this.generateImportTemplate = this.generateImportTemplate.bind(this)
             this.get = this.get.bind(this)
             this.getEmailStats = this.getEmailStats.bind(this)
             this.getSMTPConfig = this.getSMTPConfig.bind(this)
@@ -361,6 +367,15 @@ export namespace ticket {
         }
 
         /**
+         * Bulk import tickets from Excel file.
+         */
+        public async bulkImportTickets(params: RequestType<typeof api_ticket_bulk_import_bulkImportTickets>): Promise<ResponseType<typeof api_ticket_bulk_import_bulkImportTickets>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/tickets/bulk-import`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_bulk_import_bulkImportTickets>
+        }
+
+        /**
          * Clears old email logs (admin only).
          */
         public async clearOldEmailLogs(params: RequestType<typeof api_ticket_email_logs_clearOldEmailLogs>): Promise<ResponseType<typeof api_ticket_email_logs_clearOldEmailLogs>> {
@@ -375,12 +390,12 @@ export namespace ticket {
         }
 
         /**
-         * Closes a ticket and optionally adds a closing comment.
+         * Closes a ticket and sets the resolution.
          */
         public async closeTicket(params: RequestType<typeof api_ticket_close_closeTicket>): Promise<ResponseType<typeof api_ticket_close_closeTicket>> {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                reason: params.reason,
+                resolution: params.resolution,
             }
 
             // Now make the actual call to the API
@@ -438,6 +453,15 @@ export namespace ticket {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/tickets/export`, {query, method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_export_exportTickets>
+        }
+
+        /**
+         * Generate Excel template for bulk import
+         */
+        public async generateImportTemplate(): Promise<ResponseType<typeof api_ticket_bulk_import_generateImportTemplate>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/tickets/import-template`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_bulk_import_generateImportTemplate>
         }
 
         /**
@@ -563,6 +587,7 @@ export namespace ticket {
                 priority:         params.priority,
                 reporterEmail:    params.reporterEmail,
                 reporterName:     params.reporterName,
+                resolution:       params.resolution,
                 status:           params.status,
                 subject:          params.subject,
             }

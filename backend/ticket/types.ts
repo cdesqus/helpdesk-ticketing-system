@@ -11,6 +11,7 @@ export interface Ticket {
   reporterName: string;
   reporterEmail?: string;
   companyName?: string;
+  resolution?: string;
   createdAt: Date;
   updatedAt: Date;
   resolvedAt?: Date;
@@ -41,6 +42,7 @@ export interface TicketStats {
   inProgress: number;
   resolved: number;
   closed: number;
+  monthly: number;
 }
 
 export interface TicketTrend {

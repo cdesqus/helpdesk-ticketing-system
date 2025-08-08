@@ -13,6 +13,7 @@ export interface CreateTicketRequest {
   reporterName?: string;
   reporterEmail?: string;
   companyName?: string;
+  resolution?: string;
   customDate?: Date;
 }
 
@@ -58,6 +59,7 @@ export const create = api<CreateTicketRequest, Ticket>(
         reporter_name: string;
         reporter_email: string | null;
         company_name: string | null;
+        resolution: string | null;
         created_at: Date;
         updated_at: Date;
         resolved_at: Date | null;
@@ -65,11 +67,11 @@ export const create = api<CreateTicketRequest, Ticket>(
       }>`
         INSERT INTO tickets (
           subject, description, status, priority, assigned_engineer,
-          reporter_name, reporter_email, company_name, custom_date, created_at, updated_at
+          reporter_name, reporter_email, company_name, resolution, custom_date, created_at, updated_at
         ) VALUES (
           ${req.subject}, ${req.description}, ${req.status || "Open"}, ${req.priority || "Medium"},
           ${assignedEngineer}, ${reporterName}, ${reporterEmail},
-          ${req.companyName || null}, ${customDate}, ${customDate}, ${now}
+          ${req.companyName || null}, ${req.resolution || null}, ${customDate}, ${customDate}, ${now}
         )
         RETURNING *
       `;
@@ -91,6 +93,7 @@ export const create = api<CreateTicketRequest, Ticket>(
         reporterName: row.reporter_name,
         reporterEmail: row.reporter_email || undefined,
         companyName: row.company_name || undefined,
+        resolution: row.resolution || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         resolvedAt: row.resolved_at || undefined,
@@ -125,6 +128,7 @@ export const create = api<CreateTicketRequest, Ticket>(
         reporterName: reporterName,
         reporterEmail: reporterEmail || undefined,
         companyName: req.companyName || undefined,
+        resolution: req.resolution || undefined,
         createdAt: now,
         updatedAt: now,
         resolvedAt: undefined,

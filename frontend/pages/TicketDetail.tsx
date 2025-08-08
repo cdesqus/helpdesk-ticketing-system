@@ -39,7 +39,8 @@ import {
   Trash2,
   XCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  CheckCircle
 } from "lucide-react";
 
 export default function TicketDetail() {
@@ -61,6 +62,7 @@ export default function TicketDetail() {
     reporterName: "",
     reporterEmail: "",
     companyName: "",
+    resolution: "",
     customDate: "",
   });
 
@@ -180,6 +182,7 @@ export default function TicketDetail() {
         reporterName: ticket.reporterName,
         reporterEmail: ticket.reporterEmail || "",
         companyName: ticket.companyName || "",
+        resolution: ticket.resolution || "",
         customDate: ticket.customDate 
           ? new Date(ticket.customDate).toISOString().slice(0, 16)
           : "",
@@ -219,6 +222,7 @@ export default function TicketDetail() {
         reporterName: ticket.reporterName,
         reporterEmail: ticket.reporterEmail || "",
         companyName: ticket.companyName || "",
+        resolution: ticket.resolution || "",
         customDate: ticket.customDate 
           ? new Date(ticket.customDate).toISOString().slice(0, 16)
           : "",
@@ -241,6 +245,7 @@ export default function TicketDetail() {
       assignedEngineer: formData.assignedEngineer === "unassigned" ? undefined : formData.assignedEngineer,
       reporterEmail: formData.reporterEmail || undefined,
       companyName: formData.companyName || undefined,
+      resolution: formData.resolution || undefined,
       customDate: formData.customDate ? new Date(formData.customDate) : undefined,
     };
 
@@ -512,6 +517,28 @@ export default function TicketDetail() {
                   </div>
                 )}
               </div>
+
+              {(ticket.resolution || isEditing) && (
+                <div className="space-y-2">
+                  <Label htmlFor="resolution">Resolution</Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="resolution"
+                      value={formData.resolution}
+                      onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
+                      rows={4}
+                      placeholder="Resolution or solution details..."
+                    />
+                  ) : ticket.resolution ? (
+                    <div className="bg-green-50 border border-green-200 p-4 rounded-md">
+                      <div className="flex items-start">
+                        <CheckCircle className="w-5 h-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                        <p className="whitespace-pre-wrap text-green-800">{ticket.resolution}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </CardContent>
           </Card>
 

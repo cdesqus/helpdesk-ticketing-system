@@ -23,7 +23,8 @@ import {
   XCircle,
   TrendingUp,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Calendar
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -137,8 +138,8 @@ export default function Dashboard() {
           </Badge>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          {[...Array(5)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardContent className="p-6">
                 <div className="h-16 bg-gray-200 rounded"></div>
@@ -171,13 +172,19 @@ export default function Dashboard() {
     inProgress: tickets.filter(t => t.status === "In Progress").length,
     resolved: tickets.filter(t => t.status === "Resolved").length,
     closed: tickets.filter(t => t.status === "Closed").length,
+    monthly: tickets.filter(t => {
+      const ticketDate = new Date(t.createdAt);
+      const currentDate = new Date();
+      return ticketDate.getMonth() === currentDate.getMonth() && 
+             ticketDate.getFullYear() === currentDate.getFullYear();
+    }).length,
   };
 
-  // Use trends and engineer stats from the stats endpoint
+  // Use trends and engineer stats from the stats endpoint, but use calculated stats for main stats
   const trends = statsData?.trends || [];
   const engineerStats = statsData?.engineerStats || [];
 
-  // Use calculated stats instead of stats from endpoint
+  // Use calculated stats instead of stats from endpoint for accuracy
   const currentStats = calculatedStats;
 
   const statusData = [
@@ -211,7 +218,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -270,6 +277,22 @@ export default function Dashboard() {
                 <p className="text-sm font-medium text-gray-500">Closed</p>
                 <p className="text-2xl font-semibold text-gray-900">
                   {currentStats.closed}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Calendar className="h-8 w-8 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">This Month</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {currentStats.monthly}
                 </p>
               </div>
             </div>
@@ -392,7 +415,7 @@ export default function Dashboard() {
           <CardTitle>Quick Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
             <div>
               <p className="text-2xl font-bold text-blue-600">{currentStats.total}</p>
               <p className="text-sm text-gray-600">Total Tickets</p>
@@ -408,6 +431,10 @@ export default function Dashboard() {
             <div>
               <p className="text-2xl font-bold text-green-600">{currentStats.closed}</p>
               <p className="text-sm text-gray-600">Completed</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-purple-600">{currentStats.monthly}</p>
+              <p className="text-sm text-gray-600">This Month</p>
             </div>
           </div>
         </CardContent>

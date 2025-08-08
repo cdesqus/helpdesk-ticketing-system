@@ -24,6 +24,7 @@ export const get = api<GetTicketRequest, Ticket>(
         reporter_name: string;
         reporter_email: string | null;
         company_name: string | null;
+        resolution: string | null;
         created_at: Date;
         updated_at: Date;
         resolved_at: Date | null;
@@ -58,6 +59,7 @@ export const get = api<GetTicketRequest, Ticket>(
         reporterName: row.reporter_name,
         reporterEmail: row.reporter_email || undefined,
         companyName: row.company_name || undefined,
+        resolution: row.resolution || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         resolvedAt: row.resolved_at || undefined,
@@ -78,6 +80,7 @@ export const get = api<GetTicketRequest, Ticket>(
           reporterName: auth.fullName,
           reporterEmail: auth.email,
           companyName: "IDESOLUSI",
+          resolution: undefined,
           createdAt: new Date(),
           updatedAt: new Date(),
           resolvedAt: undefined,

@@ -69,7 +69,7 @@ export const exportTickets = api<ExportTicketsRequest, ExportTicketsResponse>(
     const query = `
       SELECT 
         id, subject, description, status, priority, assigned_engineer,
-        reporter_name, reporter_email, company_name, created_at, updated_at,
+        reporter_name, reporter_email, company_name, resolution, created_at, updated_at,
         resolved_at, custom_date
       FROM tickets ${whereClause}
       ORDER BY created_at DESC
@@ -85,6 +85,7 @@ export const exportTickets = api<ExportTicketsRequest, ExportTicketsResponse>(
       reporter_name: string;
       reporter_email: string | null;
       company_name: string | null;
+      resolution: string | null;
       created_at: Date;
       updated_at: Date;
       resolved_at: Date | null;
@@ -142,7 +143,7 @@ function getDateRangeString(startDate?: string, endDate?: string): string {
 function generateCSV(rows: any[]): string {
   const headers = [
     "ID", "Subject", "Description", "Status", "Priority", "Assigned Engineer",
-    "Reporter Name", "Reporter Email", "Company", "Created At", "Updated At",
+    "Reporter Name", "Reporter Email", "Company", "Resolution", "Created At", "Updated At",
     "Resolved At", "Custom Date"
   ];
   
@@ -159,6 +160,7 @@ function generateCSV(rows: any[]): string {
       `"${row.reporter_name.replace(/"/g, '""')}"`,
       row.reporter_email || "",
       row.company_name || "",
+      row.resolution ? `"${row.resolution.replace(/"/g, '""')}"` : "",
       row.created_at.toISOString(),
       row.updated_at.toISOString(),
       row.resolved_at ? row.resolved_at.toISOString() : "",
@@ -206,7 +208,11 @@ function generateTextReport(rows: any[], startDate?: string, endDate?: string): 
     if (row.custom_date) {
       report += `Custom Date: ${row.custom_date.toLocaleString()}\n`;
     }
-    report += `Description: ${row.description}\n\n`;
+    report += `Description: ${row.description}\n`;
+    if (row.resolution) {
+      report += `Resolution: ${row.resolution}\n`;
+    }
+    report += "\n";
   }
   
   return report;

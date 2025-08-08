@@ -38,6 +38,7 @@ export default function CreateTicket() {
     reporterName: "",
     reporterEmail: "",
     companyName: "",
+    resolution: "",
     customDate: defaultDateTime,
   });
 
@@ -102,6 +103,7 @@ export default function CreateTicket() {
       reporterName: formData.reporterName.trim() || undefined,
       reporterEmail: formData.reporterEmail.trim() || undefined,
       companyName: formData.companyName.trim() || undefined,
+      resolution: formData.resolution.trim() || undefined,
       customDate: formData.customDate ? new Date(formData.customDate) : undefined,
     };
 
@@ -280,6 +282,23 @@ export default function CreateTicket() {
                 disabled={createMutation.isPending}
               />
             </div>
+
+            {showEngineerAssignment && (
+              <div className="space-y-2">
+                <Label htmlFor="resolution">Resolution (Optional)</Label>
+                <Textarea
+                  id="resolution"
+                  value={formData.resolution}
+                  onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
+                  placeholder="Resolution or solution details (if already resolved)"
+                  rows={4}
+                  disabled={createMutation.isPending}
+                />
+                <p className="text-xs text-gray-500">
+                  Only fill this if the ticket is being created as already resolved
+                </p>
+              </div>
+            )}
 
             {user?.role === "reporter" && (
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4">

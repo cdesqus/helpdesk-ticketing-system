@@ -16,45 +16,37 @@ export interface LoginResponseWithCookie {
   session: Cookie<"session">;
 }
 
-// Simple session storage (in production, use Redis or database)
-const activeSessions = new Map<string, { 
-  userId: number; 
-  username: string; 
-  role: UserRole; 
-  createdAt: Date;
-  expiresAt: Date;
-  lastAccessed: Date;
-}>();
-
 // Generate a simple session token
 function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// Clean up expired sessions periodically (but don't be too aggressive)
-function cleanupExpiredSessions() {
+// Store session in database instead of memory
+async function storeSession(token: string, userId: number, username: string, role: UserRole) {
   const now = new Date();
-  const expiredTokens: string[] = [];
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
   
-  for (const [token, session] of activeSessions.entries()) {
-    // Only remove sessions that are significantly expired (add 1 hour buffer)
-    const bufferTime = new Date(session.expiresAt.getTime() + 60 * 60 * 1000);
-    if (now > bufferTime) {
-      expiredTokens.push(token);
-    }
-  }
-  
-  for (const token of expiredTokens) {
-    activeSessions.delete(token);
-  }
-  
-  if (expiredTokens.length > 0) {
-    console.log(`Cleaned up ${expiredTokens.length} expired sessions`);
+  try {
+    // First, clean up any existing sessions for this user (optional - allow multiple sessions)
+    // await authDB.exec`DELETE FROM user_sessions WHERE user_id = ${userId}`;
+    
+    // Insert new session
+    await authDB.exec`
+      INSERT INTO user_sessions (token, user_id, username, role, created_at, expires_at, last_accessed)
+      VALUES (${token}, ${userId}, ${username}, ${role}, ${now}, ${expiresAt}, ${now})
+      ON CONFLICT (token) DO UPDATE SET
+        expires_at = ${expiresAt},
+        last_accessed = ${now}
+    `;
+    
+    console.log(`Session stored for user ${username} (${userId}), expires: ${expiresAt.toISOString()}`);
+    return expiresAt;
+  } catch (error) {
+    console.error("Failed to store session in database:", error);
+    // Fallback: return a future date even if database fails
+    return expiresAt;
   }
 }
-
-// Clean up expired sessions every 2 hours (less frequent)
-setInterval(cleanupExpiredSessions, 2 * 60 * 60 * 1000);
 
 // Authenticates a user with username and password.
 export const login = api<LoginRequest, LoginResponseWithCookie>(
@@ -80,18 +72,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
-      
-      // Store session with 48-hour expiration
-      activeSessions.set(token, {
-        userId: dummyUser.id,
-        username: dummyUser.username,
-        role: dummyUser.role,
-        createdAt: now,
-        expiresAt: expiresAt,
-        lastAccessed: now,
-      });
+      const expiresAt = await storeSession(token, dummyUser.id, dummyUser.username, dummyUser.role);
 
       console.log(`Admin user logged in successfully with token: ${token.substring(0, 8)}... (expires: ${expiresAt.toISOString()})`);
 
@@ -100,7 +81,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 48 hours
+          expires: expiresAt,
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -122,18 +103,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
-      
-      // Store session with 48-hour expiration
-      activeSessions.set(token, {
-        userId: haryantoDummyUser.id,
-        username: haryantoDummyUser.username,
-        role: haryantoDummyUser.role,
-        createdAt: now,
-        expiresAt: expiresAt,
-        lastAccessed: now,
-      });
+      const expiresAt = await storeSession(token, haryantoDummyUser.id, haryantoDummyUser.username, haryantoDummyUser.role);
 
       console.log(`Haryanto user logged in successfully with token: ${token.substring(0, 8)}... (expires: ${expiresAt.toISOString()})`);
 
@@ -142,7 +112,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 48 hours
+          expires: expiresAt,
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -181,18 +151,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       }
 
       const token = generateSessionToken();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
-      
-      // Store session with 48-hour expiration
-      activeSessions.set(token, {
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        createdAt: now,
-        expiresAt: expiresAt,
-        lastAccessed: now,
-      });
+      const expiresAt = await storeSession(token, user.id, user.username, user.role);
 
       const userResponse: User = {
         id: user.id,
@@ -212,7 +171,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
         token,
         session: {
           value: token,
-          expires: expiresAt, // Set cookie expiration to 48 hours
+          expires: expiresAt,
           httpOnly: true,
           secure: true,
           sameSite: "Lax",
@@ -225,73 +184,144 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
   }
 );
 
-// Export session management functions for use in auth handler
-export function getSession(token: string) {
+// Get session from database with automatic refresh
+export async function getSession(token: string) {
   if (!token) {
     console.log("getSession: No token provided");
     return null;
   }
 
-  const session = activeSessions.get(token);
-  if (!session) {
-    console.log("getSession: Session not found for token:", token.substring(0, 8) + "...");
-    console.log("getSession: Active sessions count:", activeSessions.size);
+  try {
+    const session = await authDB.queryRow<{
+      token: string;
+      user_id: number;
+      username: string;
+      role: UserRole;
+      created_at: Date;
+      expires_at: Date;
+      last_accessed: Date;
+    }>`SELECT * FROM user_sessions WHERE token = ${token}`;
+
+    if (!session) {
+      console.log("getSession: Session not found for token:", token.substring(0, 8) + "...");
+      return null;
+    }
+    
+    const now = new Date();
+    
+    // Check if session has expired
+    if (now > session.expires_at) {
+      // Clean up expired session
+      await authDB.exec`DELETE FROM user_sessions WHERE token = ${token}`;
+      console.log("getSession: Session expired and removed:", token.substring(0, 8) + "...", "expired at:", session.expires_at.toISOString());
+      return null;
+    }
+    
+    // Auto-extend session if it's more than halfway to expiration
+    const sessionDuration = session.expires_at.getTime() - session.created_at.getTime();
+    const halfwayPoint = new Date(session.created_at.getTime() + sessionDuration / 2);
+    
+    if (now > halfwayPoint) {
+      // Extend session by another 7 days
+      const newExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      await authDB.exec`
+        UPDATE user_sessions 
+        SET expires_at = ${newExpiresAt}, last_accessed = ${now}
+        WHERE token = ${token}
+      `;
+      console.log("getSession: Session extended for token:", token.substring(0, 8) + "...", "new expires at:", newExpiresAt.toISOString());
+      
+      return {
+        userId: session.user_id,
+        username: session.username,
+        role: session.role,
+        createdAt: session.created_at,
+        expiresAt: newExpiresAt,
+        lastAccessed: now,
+      };
+    } else {
+      // Just update last accessed time
+      await authDB.exec`
+        UPDATE user_sessions 
+        SET last_accessed = ${now}
+        WHERE token = ${token}
+      `;
+    }
+    
+    console.log("getSession: Valid session found for token:", token.substring(0, 8) + "...", "expires at:", session.expires_at.toISOString());
+    return {
+      userId: session.user_id,
+      username: session.username,
+      role: session.role,
+      createdAt: session.created_at,
+      expiresAt: session.expires_at,
+      lastAccessed: now,
+    };
+  } catch (error) {
+    console.error("getSession: Database error:", error);
     return null;
   }
-  
-  const now = new Date();
-  
-  // Check if session has expired (with some tolerance)
-  if (now > session.expiresAt) {
-    activeSessions.delete(token);
-    console.log("getSession: Session expired and removed:", token.substring(0, 8) + "...", "expired at:", session.expiresAt.toISOString(), "current time:", now.toISOString());
-    return null;
-  }
-  
-  // Update last accessed time but don't extend expiration automatically
-  // Only extend if session is more than halfway to expiration
-  const halfwayPoint = new Date(session.createdAt.getTime() + (session.expiresAt.getTime() - session.createdAt.getTime()) / 2);
-  
-  if (now > halfwayPoint) {
-    // Extend session by another 48 hours
-    const newExpiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    session.expiresAt = newExpiresAt;
-    console.log("getSession: Session extended for token:", token.substring(0, 8) + "...", "new expires at:", session.expiresAt.toISOString());
-  }
-  
-  session.lastAccessed = now;
-  
-  console.log("getSession: Valid session found for token:", token.substring(0, 8) + "...", "expires at:", session.expiresAt.toISOString());
-  return session;
 }
 
-export function removeSession(token: string) {
+export async function removeSession(token: string) {
   if (token) {
-    const deleted = activeSessions.delete(token);
-    console.log(`removeSession: Session removed: ${token.substring(0, 8)}... (existed: ${deleted})`);
+    try {
+      await authDB.exec`DELETE FROM user_sessions WHERE token = ${token}`;
+      console.log(`removeSession: Session removed: ${token.substring(0, 8)}...`);
+    } catch (error) {
+      console.error("removeSession: Database error:", error);
+    }
   }
 }
 
-export function getAllActiveSessions() {
-  const now = new Date();
-  return Array.from(activeSessions.entries()).map(([token, session]) => ({
-    token: token.substring(0, 8) + "...",
-    userId: session.userId,
-    username: session.username,
-    role: session.role,
-    createdAt: session.createdAt,
-    expiresAt: session.expiresAt,
-    lastAccessed: session.lastAccessed,
-    isExpired: now > session.expiresAt,
-    timeUntilExpiry: session.expiresAt.getTime() - now.getTime(),
-  }));
+export async function getAllActiveSessions() {
+  try {
+    const sessions = await authDB.queryAll<{
+      token: string;
+      user_id: number;
+      username: string;
+      role: UserRole;
+      created_at: Date;
+      expires_at: Date;
+      last_accessed: Date;
+    }>`SELECT * FROM user_sessions WHERE expires_at > NOW() ORDER BY last_accessed DESC`;
+
+    const now = new Date();
+    return sessions.map(session => ({
+      token: session.token.substring(0, 8) + "...",
+      userId: session.user_id,
+      username: session.username,
+      role: session.role,
+      createdAt: session.created_at,
+      expiresAt: session.expires_at,
+      lastAccessed: session.last_accessed,
+      isExpired: now > session.expires_at,
+      timeUntilExpiry: session.expires_at.getTime() - now.getTime(),
+    }));
+  } catch (error) {
+    console.error("getAllActiveSessions: Database error:", error);
+    return [];
+  }
 }
+
+// Clean up expired sessions periodically
+export async function cleanupExpiredSessions() {
+  try {
+    const result = await authDB.exec`DELETE FROM user_sessions WHERE expires_at < NOW()`;
+    console.log("Cleaned up expired sessions");
+  } catch (error) {
+    console.error("cleanupExpiredSessions: Database error:", error);
+  }
+}
+
+// Run cleanup every hour
+setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
 
 // Debug endpoint to check active sessions (admin only)
 export const getActiveSessions = api<void, { sessions: any[] }>(
   { auth: true, expose: true, method: "GET", path: "/auth/sessions" },
   async () => {
-    return { sessions: getAllActiveSessions() };
+    return { sessions: await getAllActiveSessions() };
   }
 );
 
@@ -307,27 +337,44 @@ export const refreshSession = api<void, { message: string; expiresAt: Date }>(
       throw APIError.unauthenticated("no session token provided");
     }
 
-    const session = activeSessions.get(token);
-    if (!session) {
-      throw APIError.unauthenticated("session not found");
+    try {
+      const session = await authDB.queryRow<{
+        token: string;
+        user_id: number;
+        username: string;
+        expires_at: Date;
+      }>`SELECT token, user_id, username, expires_at FROM user_sessions WHERE token = ${token}`;
+
+      if (!session) {
+        throw APIError.unauthenticated("session not found");
+      }
+
+      const now = new Date();
+      if (now > session.expires_at) {
+        await authDB.exec`DELETE FROM user_sessions WHERE token = ${token}`;
+        throw APIError.unauthenticated("session has expired");
+      }
+
+      // Extend session by another 7 days
+      const newExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      await authDB.exec`
+        UPDATE user_sessions 
+        SET expires_at = ${newExpiresAt}, last_accessed = ${now}
+        WHERE token = ${token}
+      `;
+
+      console.log(`Session refreshed for user ${session.username}, new expiry: ${newExpiresAt.toISOString()}`);
+
+      return {
+        message: "Session refreshed successfully",
+        expiresAt: newExpiresAt,
+      };
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      console.error("refreshSession: Database error:", error);
+      throw APIError.internal("Failed to refresh session");
     }
-
-    const now = new Date();
-    if (now > session.expiresAt) {
-      activeSessions.delete(token);
-      throw APIError.unauthenticated("session has expired");
-    }
-
-    // Extend session by another 48 hours
-    const newExpiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    session.expiresAt = newExpiresAt;
-    session.lastAccessed = now;
-
-    console.log(`Session refreshed for user ${session.username}, new expiry: ${newExpiresAt.toISOString()}`);
-
-    return {
-      message: "Session refreshed successfully",
-      expiresAt: newExpiresAt,
-    };
   }
 );

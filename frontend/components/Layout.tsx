@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import SystemLogo from "./SystemLogo";
 import { 
   LayoutDashboard, 
@@ -10,7 +11,9 @@ import {
   Plus, 
   Settings,
   Users,
-  LogOut
+  LogOut,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 
 interface LayoutProps {
@@ -19,7 +22,22 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+  // Handle online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   if (!user) {
     return <>{children}</>;
@@ -59,11 +77,34 @@ export default function Layout({ children }: LayoutProps) {
               <SystemLogo />
             </div>
             
+            {/* Connection Status */}
+            <div className="px-4 mt-4">
+              <div className={`flex items-center space-x-2 p-2 rounded-md ${
+                isOnline ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              }`}>
+                {isOnline ? (
+                  <Wifi className="w-4 h-4" />
+                ) : (
+                  <WifiOff className="w-4 h-4" />
+                )}
+                <span className="text-xs font-medium">
+                  {isOnline ? 'Online' : 'Offline'}
+                </span>
+              </div>
+            </div>
+            
             {/* User Info */}
-            <div className="px-4 mt-6">
+            <div className="px-4 mt-4">
               <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
-                <p className="text-xs text-gray-500">{user.role}</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
+                    <p className="text-xs text-gray-500">{user.role}</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {isAuthenticated ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
               </div>
             </div>
             
@@ -94,6 +135,14 @@ export default function Layout({ children }: LayoutProps) {
                 })}
               </nav>
               
+              {/* Session Info */}
+              <div className="px-4 pb-2">
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p>Session: Active</p>
+                  <p>Auto-refresh: Every 30min</p>
+                </div>
+              </div>
+              
               {/* Logout Button */}
               <div className="px-2 pb-4">
                 <Button
@@ -111,6 +160,14 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Main content */}
         <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Offline Banner */}
+          {!isOnline && (
+            <div className="bg-red-600 text-white px-4 py-2 text-center text-sm">
+              <WifiOff className="w-4 h-4 inline mr-2" />
+              You are currently offline. Some features may not work properly.
+            </div>
+          )}
+          
           <main className="flex-1 relative overflow-y-auto focus:outline-none">
             <div className="py-6">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">

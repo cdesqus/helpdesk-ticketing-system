@@ -56,6 +56,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Auto-refresh session every 30 minutes
+  useEffect(() => {
+    if (token) {
+      const refreshInterval = setInterval(async () => {
+        try {
+          console.log("Auto-refreshing session...");
+          const authenticatedBackend = backend.with({
+            auth: () => Promise.resolve({ authorization: `Bearer ${token}` })
+          });
+          
+          await authenticatedBackend.auth.refreshSession();
+          console.log("Session auto-refreshed successfully");
+        } catch (error) {
+          console.error("Auto-refresh failed:", error);
+          // If refresh fails, try to get current user to check if session is still valid
+          try {
+            const currentUser = await authenticatedBackend.auth.getCurrentUser();
+            console.log("Session still valid for user:", currentUser.username);
+          } catch (userError) {
+            console.error("Session invalid, logging out:", userError);
+            logout();
+          }
+        }
+      }, 30 * 60 * 1000); // 30 minutes
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [token]);
+
   useEffect(() => {
     // Check for existing session on app load
     const storedToken = localStorage.getItem("auth_token");
@@ -70,8 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(parsedUser);
         console.log("Restored session for user:", parsedUser.username);
         
-        // Don't verify immediately on load to avoid 401 errors
-        setIsLoading(false);
+        // Verify session is still valid in the background
+        setTimeout(() => {
+          refreshAuth();
+        }, 1000);
       } catch (error) {
         console.error("Failed to parse stored user data:", error);
         localStorage.removeItem("auth_token");
@@ -154,9 +185,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Returns the authenticated backend client
+// Returns the authenticated backend client with automatic retry on 401
 export function useBackend() {
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
   
   console.log("useBackend called:", { hasToken: !!token, username: user?.username });
   
@@ -171,7 +202,57 @@ export function useBackend() {
       return Promise.resolve({ authorization: `Bearer ${token}` });
     }
   });
+
+  // Create a proxy to handle 401 errors automatically
+  const backendProxy = new Proxy(authenticatedBackend, {
+    get(target, prop) {
+      const originalMethod = target[prop];
+      
+      if (typeof originalMethod === 'object' && originalMethod !== null) {
+        // Handle nested objects (like ticket.list, auth.getCurrentUser, etc.)
+        return new Proxy(originalMethod, {
+          get(nestedTarget, nestedProp) {
+            const nestedMethod = nestedTarget[nestedProp];
+            
+            if (typeof nestedMethod === 'function') {
+              return async (...args: any[]) => {
+                try {
+                  return await nestedMethod.apply(nestedTarget, args);
+                } catch (error: any) {
+                  if (error?.status === 401) {
+                    console.error("401 Unauthorized - Session expired, logging out");
+                    logout();
+                    throw new Error("Session expired. Please log in again.");
+                  }
+                  throw error;
+                }
+              };
+            }
+            
+            return nestedMethod;
+          }
+        });
+      }
+      
+      if (typeof originalMethod === 'function') {
+        return async (...args: any[]) => {
+          try {
+            return await originalMethod.apply(target, args);
+          } catch (error: any) {
+            if (error?.status === 401) {
+              console.error("401 Unauthorized - Session expired, logging out");
+              logout();
+              throw new Error("Session expired. Please log in again.");
+            }
+            throw error;
+          }
+        };
+      }
+      
+      return originalMethod;
+    }
+  });
   
-  console.log("Returning authenticated backend client");
-  return authenticatedBackend;
+  console.log("Returning authenticated backend client with auto-logout on 401");
+  return backendProxy;
 }

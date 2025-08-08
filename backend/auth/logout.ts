@@ -25,8 +25,8 @@ export const logout = api<LogoutParams & LogoutRequest, LogoutResponse>(
                   req.session?.value;
     
     if (token) {
-      // Remove the session from storage
-      removeSession(token);
+      // Remove the session from database
+      await removeSession(token);
       console.log(`User logged out, token: ${token.substring(0, 8)}...`);
     } else {
       console.log("Logout called without token");

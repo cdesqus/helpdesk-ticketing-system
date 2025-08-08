@@ -78,7 +78,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
       const now = new Date();
       
       // Store session
@@ -120,7 +120,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       };
 
       const token = generateSessionToken();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
       const now = new Date();
       
       // Store session
@@ -179,7 +179,7 @@ export const login = api<LoginRequest, LoginResponseWithCookie>(
       }
 
       const token = generateSessionToken();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
       const now = new Date();
       
       // Store session

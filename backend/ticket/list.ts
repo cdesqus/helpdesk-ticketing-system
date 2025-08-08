@@ -34,10 +34,24 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
 
       // Apply role-based filtering
       if (auth.role === "engineer") {
-        // Engineers can only see tickets assigned to them
-        whereClause += ` AND assigned_engineer = $${paramIndex}`;
-        params.push(auth.fullName);
-        paramIndex++;
+        // Engineers can see all tickets, but if no specific engineer filter is applied,
+        // default to showing only their assigned tickets
+        if (!req.assignedEngineer) {
+          // Default filter: show only tickets assigned to this engineer
+          whereClause += ` AND assigned_engineer = $${paramIndex}`;
+          params.push(auth.fullName);
+          paramIndex++;
+        } else if (req.assignedEngineer !== "all") {
+          // Specific engineer filter applied
+          if (req.assignedEngineer === "Unassigned") {
+            whereClause += ` AND assigned_engineer IS NULL`;
+          } else {
+            whereClause += ` AND assigned_engineer = $${paramIndex}`;
+            params.push(req.assignedEngineer);
+            paramIndex++;
+          }
+        }
+        // If assignedEngineer is "all", don't add any engineer filter (show all tickets)
       } else if (auth.role === "reporter") {
         // Reporters can only see their own tickets
         whereClause += ` AND reporter_email = $${paramIndex}`;
@@ -58,10 +72,11 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
         paramIndex++;
       }
 
-      if (req.assignedEngineer && auth.role === "admin") {
+      // For admin role, apply engineer filter if specified
+      if (auth.role === "admin" && req.assignedEngineer) {
         if (req.assignedEngineer === "Unassigned") {
           whereClause += ` AND assigned_engineer IS NULL`;
-        } else {
+        } else if (req.assignedEngineer !== "all") {
           whereClause += ` AND assigned_engineer = $${paramIndex}`;
           params.push(req.assignedEngineer);
           paramIndex++;
@@ -159,7 +174,7 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
           description: "This is a sample ticket created because the database is not accessible. The system is running in fallback mode.",
           status: "Open",
           priority: "High",
-          assignedEngineer: undefined,
+          assignedEngineer: auth.role === "engineer" ? auth.fullName : undefined,
           reporterName: auth.fullName,
           reporterEmail: auth.email,
           companyName: "IDESOLUSI",
@@ -174,7 +189,7 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
           description: "This is another sample ticket for demonstration purposes. The system is working in fallback mode.",
           status: "In Progress",
           priority: "Medium",
-          assignedEngineer: "System Admin",
+          assignedEngineer: auth.role === "engineer" ? auth.fullName : "System Admin",
           reporterName: auth.fullName,
           reporterEmail: auth.email,
           companyName: "IDESOLUSI",
@@ -188,7 +203,10 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
       // Filter fallback tickets based on role
       let filteredTickets = fallbackTickets;
       if (auth.role === "engineer") {
-        filteredTickets = fallbackTickets.filter(t => t.assignedEngineer === auth.fullName);
+        // For engineers, if no specific filter, show only their assigned tickets
+        if (!req.assignedEngineer) {
+          filteredTickets = fallbackTickets.filter(t => t.assignedEngineer === auth.fullName);
+        }
       } else if (auth.role === "reporter") {
         filteredTickets = fallbackTickets.filter(t => t.reporterEmail === auth.email);
       }

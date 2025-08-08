@@ -69,7 +69,12 @@ export default function TicketList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<TicketStatus | "all">("all");
   const [priority, setPriority] = useState<TicketPriority | "all">("all");
-  const [assignedEngineer, setAssignedEngineer] = useState("all");
+  
+  // For engineers, default to showing their own tickets, but allow viewing all
+  const [assignedEngineer, setAssignedEngineer] = useState(
+    user?.role === "engineer" ? user.fullName : "all"
+  );
+  
   const [page, setPage] = useState(0);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"excel" | "pdf">("excel");
@@ -94,7 +99,7 @@ export default function TicketList() {
           search: search || undefined,
           status: status === "all" ? undefined : status,
           priority: priority === "all" ? undefined : priority,
-          assignedEngineer: assignedEngineer === "all" ? undefined : (assignedEngineer === "unassigned" ? "Unassigned" : assignedEngineer),
+          assignedEngineer: assignedEngineer === "all" ? "all" : (assignedEngineer === "unassigned" ? "Unassigned" : assignedEngineer),
           limit,
           offset: page * limit,
         });
@@ -279,7 +284,8 @@ export default function TicketList() {
     user: user?.username,
     userRole: user?.role,
     selectedCount: selectedTickets.size,
-    isSelectMode
+    isSelectMode,
+    assignedEngineer
   });
 
   return (
@@ -414,6 +420,30 @@ export default function TicketList() {
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Retry
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Engineer Filter Info */}
+      {user?.role === "engineer" && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-blue-600 mr-3" />
+                <div>
+                  <p className="text-blue-800 font-medium">Engineer View</p>
+                  <p className="text-blue-600 text-sm">
+                    {assignedEngineer === user.fullName 
+                      ? "Showing only tickets assigned to you. Use the filter below to view all tickets."
+                      : assignedEngineer === "all" 
+                        ? "Showing all tickets. You can filter by engineer to see specific assignments."
+                        : `Showing tickets assigned to ${assignedEngineer}.`
+                    }
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

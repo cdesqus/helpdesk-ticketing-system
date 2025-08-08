@@ -32,7 +32,7 @@ function AppRoutes() {
         
         {/* Protected routes */}
         <Route path="/dashboard" element={
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute allowedRoles={["admin", "engineer"]}>
             <Dashboard />
           </ProtectedRoute>
         } />
@@ -70,7 +70,9 @@ function AppRoutes() {
         {/* Redirect based on role */}
         <Route path="*" element={
           isAuthenticated ? (
-            user?.role === "admin" ? <Navigate to="/dashboard" replace /> : <Navigate to="/tickets" replace />
+            user?.role === "admin" ? <Navigate to="/dashboard" replace /> : 
+            user?.role === "engineer" ? <Navigate to="/dashboard" replace /> :
+            <Navigate to="/tickets" replace />
           ) : (
             <Navigate to="/" replace />
           )

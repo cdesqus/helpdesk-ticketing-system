@@ -27,7 +27,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const getNavigation = () => {
     const baseNav = [
-      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin"] },
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "engineer"] },
       { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "engineer", "reporter"] },
     ];
 

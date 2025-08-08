@@ -98,7 +98,8 @@ export interface ClientOptions {
  */
 import {
     getActiveSessions as api_auth_login_getActiveSessions,
-    login as api_auth_login_login
+    login as api_auth_login_login,
+    refreshSession as api_auth_login_refreshSession
 } from "~backend/auth/login";
 import { logout as api_auth_logout_logout } from "~backend/auth/logout";
 import {
@@ -108,6 +109,7 @@ import {
 import {
     changePassword as api_auth_users_changePassword,
     createUser as api_auth_users_createUser,
+    deleteUser as api_auth_users_deleteUser,
     getCurrentUser as api_auth_users_getCurrentUser,
     listUsers as api_auth_users_listUsers,
     updateUser as api_auth_users_updateUser
@@ -122,12 +124,14 @@ export namespace auth {
             this.baseClient = baseClient
             this.changePassword = this.changePassword.bind(this)
             this.createUser = this.createUser.bind(this)
+            this.deleteUser = this.deleteUser.bind(this)
             this.forgotPassword = this.forgotPassword.bind(this)
             this.getActiveSessions = this.getActiveSessions.bind(this)
             this.getCurrentUser = this.getCurrentUser.bind(this)
             this.listUsers = this.listUsers.bind(this)
             this.login = this.login.bind(this)
             this.logout = this.logout.bind(this)
+            this.refreshSession = this.refreshSession.bind(this)
             this.resetPassword = this.resetPassword.bind(this)
             this.updateUser = this.updateUser.bind(this)
         }
@@ -151,6 +155,13 @@ export namespace auth {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/auth/users`, {method: "POST", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_auth_users_createUser>
+        }
+
+        /**
+         * Deletes a user (admin only).
+         */
+        public async deleteUser(params: { id: number }): Promise<void> {
+            await this.baseClient.callTypedAPI(`/auth/users/${encodeURIComponent(params.id)}`, {method: "DELETE", body: undefined})
         }
 
         /**
@@ -215,6 +226,15 @@ export namespace auth {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/auth/logout`, {headers, method: "POST", body: JSON.stringify(body)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_auth_logout_logout>
+        }
+
+        /**
+         * Endpoint to extend session (refresh session expiration)
+         */
+        public async refreshSession(): Promise<ResponseType<typeof api_auth_login_refreshSession>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/auth/refresh`, {method: "POST", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_auth_login_refreshSession>
         }
 
         /**
@@ -415,17 +435,11 @@ export namespace ticket {
         }
 
         /**
-         * Retrieves ticket statistics and trends.
+         * Retrieves ticket statistics and trends with role-based filtering.
          */
-        public async getStats(params: RequestType<typeof api_ticket_stats_getStats>): Promise<ResponseType<typeof api_ticket_stats_getStats>> {
-            // Convert our params into the objects we need for the request
-            const query = makeRecord<string, string | string[]>({
-                endDate:   params.endDate,
-                startDate: params.startDate,
-            })
-
+        public async getStats(): Promise<ResponseType<typeof api_ticket_stats_getStats>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/tickets/stats`, {query, method: "GET", body: undefined})
+            const resp = await this.baseClient.callTypedAPI(`/tickets/stats`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ticket_stats_getStats>
         }
 

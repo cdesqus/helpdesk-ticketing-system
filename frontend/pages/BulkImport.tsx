@@ -125,13 +125,12 @@ export default function BulkImport() {
       const validTypes = [
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
         'application/vnd.ms-excel', // .xls
-        'text/csv' // .csv
       ];
       
-      if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls') && !file.name.toLowerCase().endsWith('.csv')) {
+      if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
         toast({
           title: "Invalid file type",
-          description: "Please select an Excel file (.xlsx, .xls) or CSV file (.csv).",
+          description: "Please select an Excel file (.xlsx, .xls).",
           variant: "destructive",
         });
         return;
@@ -205,7 +204,7 @@ export default function BulkImport() {
             <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
               <li>Download the Excel template using the button below</li>
               <li>Fill in your ticket data following the template format</li>
-              <li>Save the file as Excel (.xlsx) or CSV (.csv) format</li>
+              <li>Save the file as Excel (.xlsx) format</li>
               <li>Upload the file using the form below</li>
               <li>Review the import results and fix any errors if needed</li>
             </ol>
@@ -228,7 +227,7 @@ export default function BulkImport() {
             <h4 className="font-medium text-yellow-900 mb-2">⚠️ Important Notes:</h4>
             <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
               <li>Maximum file size: 10MB</li>
-              <li>Supported formats: Excel (.xlsx, .xls) and CSV (.csv)</li>
+              <li>Supported formats: Excel (.xlsx, .xls)</li>
               <li>Email notifications will be sent if reporterEmail is provided</li>
               <li>Invalid rows will be skipped and reported in the results</li>
               <li>Priority values: Low, Medium, High, Urgent (default: Medium)</li>
@@ -280,11 +279,11 @@ export default function BulkImport() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="file">Select Excel or CSV File</Label>
+            <Label htmlFor="file">Select Excel File</Label>
             <Input
               id="file"
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.xls"
               onChange={handleFileSelect}
               disabled={importMutation.isPending}
             />

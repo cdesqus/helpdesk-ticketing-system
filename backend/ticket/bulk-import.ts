@@ -3,6 +3,7 @@ import { getAuthData } from "~encore/auth";
 import { ticketDB } from "./db";
 import type { Ticket, TicketStatus, TicketPriority } from "./types";
 import { sendTicketNotification } from "./email";
+import * as XLSX from 'xlsx';
 
 export interface BulkImportTicketsRequest {
   data: string; // Base64 encoded Excel file data
@@ -38,7 +39,7 @@ export const bulkImportTickets = api<BulkImportTicketsRequest, BulkImportResult>
       // Decode base64 data
       const fileBuffer = Buffer.from(req.data, 'base64');
       
-      // Parse Excel file (simplified - in real implementation use xlsx library)
+      // Parse Excel file
       const excelData = parseExcelFile(fileBuffer);
       
       const result: BulkImportResult = {
@@ -57,23 +58,23 @@ export const bulkImportTickets = api<BulkImportTicketsRequest, BulkImportResult>
         const rowNumber = i + 2; // Excel row number (accounting for header)
 
         try {
-          // Validate required fields
-          if (!rowData.subject || !rowData.description || !rowData.reporterName) {
+          // Validate required fields using normalized keys
+          if (!rowData.subject || !rowData.description || !rowData.reportername) {
             throw new Error("Missing required fields: subject, description, or reporterName");
           }
 
           // Determine status based on resolution
-          const status: TicketStatus = rowData.resolution && rowData.resolution.trim() 
+          const status: TicketStatus = rowData.resolution && String(rowData.resolution).trim() 
             ? "Closed" 
             : "Open";
 
           const now = new Date();
-          const customDate = rowData.customDate ? new Date(rowData.customDate) : now;
+          const customDate = rowData.customdate ? new Date(rowData.customdate) : now;
           
           // Handle "unassigned" value
-          const assignedEngineer = rowData.assignedEngineer === "unassigned" || !rowData.assignedEngineer 
+          const assignedEngineer = rowData.assignedengineer === "unassigned" || !rowData.assignedengineer 
             ? null 
-            : rowData.assignedEngineer;
+            : rowData.assignedengineer;
 
           // Insert ticket into database
           const row = await ticketDB.queryRow<{
@@ -98,8 +99,8 @@ export const bulkImportTickets = api<BulkImportTicketsRequest, BulkImportResult>
               custom_date, created_at, updated_at, resolved_at
             ) VALUES (
               ${rowData.subject}, ${rowData.description}, ${status}, ${rowData.priority || "Medium"},
-              ${assignedEngineer}, ${rowData.reporterName}, ${rowData.reporterEmail || null},
-              ${rowData.companyName || null}, ${rowData.resolution || null}, 
+              ${assignedEngineer}, ${rowData.reportername}, ${rowData.reporteremail || null},
+              ${rowData.companyname || null}, ${rowData.resolution || null}, 
               ${customDate}, ${customDate}, ${now}, ${status === "Closed" ? now : null}
             )
             RETURNING *
@@ -127,7 +128,7 @@ export const bulkImportTickets = api<BulkImportTicketsRequest, BulkImportResult>
             result.successCount++;
 
             // Send email notification if reporter has email
-            if (rowData.reporterEmail) {
+            if (rowData.reporteremail) {
               try {
                 await sendTicketNotification(ticket, "created");
               } catch (emailError) {
@@ -159,47 +160,28 @@ export const bulkImportTickets = api<BulkImportTicketsRequest, BulkImportResult>
   }
 );
 
-// Simplified Excel parser (in real implementation, use xlsx library)
 function parseExcelFile(buffer: Buffer): any[] {
-  // This is a simplified implementation
-  // In a real application, you would use a library like 'xlsx' to parse Excel files
-  
-  // For now, we'll simulate parsing by returning mock data
-  // In production, this would parse the actual Excel file
-  
   try {
-    // Mock implementation - replace with actual xlsx parsing
-    const mockData = [
-      {
-        subject: "Sample Ticket 1",
-        description: "This is a sample ticket description",
-        priority: "Medium",
-        assignedEngineer: "John Smith",
-        reporterName: "Jane Doe",
-        reporterEmail: "jane.doe@example.com",
-        companyName: "IDESOLUSI",
-        resolution: "", // Empty resolution = Open status
-        customDate: new Date().toISOString()
-      },
-      {
-        subject: "Sample Ticket 2",
-        description: "This is another sample ticket",
-        priority: "High",
-        assignedEngineer: "Sarah Johnson",
-        reporterName: "Bob Wilson",
-        reporterEmail: "bob.wilson@example.com",
-        companyName: "IDESOLUSI",
-        resolution: "Issue resolved by restarting the service", // Has resolution = Closed status
-        customDate: new Date().toISOString()
-      }
-    ];
-
-    // In real implementation, parse the Excel buffer here
-    // const workbook = XLSX.read(buffer, { type: 'buffer' });
-    // const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    // const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    const worksheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[worksheetName];
     
-    return mockData;
+    const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      dateNF: 'yyyy-mm-dd hh:mm:ss'
+    });
+
+    // Normalize keys to be consistent (lowercase, no spaces)
+    return jsonData.map(row => {
+      const newRow: { [key: string]: any } = {};
+      for (const key in row) {
+        if (Object.prototype.hasOwnProperty.call(row, key)) {
+          const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '');
+          newRow[normalizedKey] = row[key];
+        }
+      }
+      return newRow;
+    });
   } catch (error) {
     throw new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -216,19 +198,18 @@ export const generateImportTemplate = api<void, { data: string; filename: string
       throw APIError.permissionDenied("only admins can download import template");
     }
 
-    // Generate CSV template (in real implementation, generate actual Excel file)
-    const csvTemplate = generateCSVTemplate();
-    const base64Data = Buffer.from(csvTemplate).toString('base64');
+    const xlsxBuffer = generateXLSXTemplateBuffer();
+    const base64Data = xlsxBuffer.toString('base64');
     
     return {
       data: base64Data,
-      filename: "ticket_import_template.csv",
-      contentType: "text/csv"
+      filename: "ticket_import_template.xlsx",
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     };
   }
 );
 
-function generateCSVTemplate(): string {
+function generateXLSXTemplateBuffer(): Buffer {
   const headers = [
     "subject",
     "description", 
@@ -250,8 +231,8 @@ function generateCSVTemplate(): string {
       "Jane Doe",
       "jane.doe@example.com",
       "IDESOLUSI",
-      "",
-      new Date().toISOString().split('T')[0]
+      "", // Empty resolution = Open status
+      new Date()
     ],
     [
       "Another Sample Ticket",
@@ -261,24 +242,27 @@ function generateCSVTemplate(): string {
       "Bob Wilson",
       "bob.wilson@example.com",
       "IDESOLUSI",
-      "Issue resolved by restarting service",
-      new Date().toISOString().split('T')[0]
+      "Issue resolved by restarting service", // Has resolution = Closed status
+      new Date()
     ]
   ];
   
-  const csvRows = [headers.join(",")];
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
   
-  for (const row of sampleRows) {
-    const csvRow = row.map(cell => {
-      // Escape quotes and wrap in quotes if contains comma
-      const cellStr = String(cell);
-      if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-        return `"${cellStr.replace(/"/g, '""')}"`;
-      }
-      return cellStr;
-    });
-    csvRows.push(csvRow.join(","));
-  }
-  
-  return csvRows.join("\n");
+  worksheet['!cols'] = [
+    { wch: 30 }, // subject
+    { wch: 50 }, // description
+    { wch: 15 }, // priority
+    { wch: 20 }, // assignedEngineer
+    { wch: 20 }, // reporterName
+    { wch: 25 }, // reporterEmail
+    { wch: 20 }, // companyName
+    { wch: 50 }, // resolution
+    { wch: 20 }, // customDate
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
+
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 }

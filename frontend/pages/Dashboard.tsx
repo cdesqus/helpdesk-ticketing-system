@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useBackend } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   BarChart, 
   Bar, 
@@ -23,19 +25,47 @@ import {
   XCircle,
   TrendingUp,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  Filter
 } from "lucide-react";
 
 export default function Dashboard() {
   const backend = useBackend();
+  
+  // State for date filters
+  const [dateFilters, setDateFilters] = useState({
+    startDate: "",
+    endDate: "",
+  });
+  
+  // State for applying filters
+  const [appliedFilters, setAppliedFilters] = useState({
+    startDate: undefined as string | undefined,
+    endDate: undefined as string | undefined,
+  });
 
   const { data: statsData, isLoading, error, refetch, isError } = useQuery({
-    queryKey: ["ticket-stats"],
+    queryKey: ["ticket-stats", appliedFilters.startDate, appliedFilters.endDate],
     queryFn: async () => {
-      console.log("Fetching dashboard stats...");
+      console.log("Fetching dashboard stats with filters:", appliedFilters);
       try {
-        // Call getStats without any parameters to get all stats
-        const result = await backend.ticket.getStats();
+        // Prepare parameters with safe defaults
+        const params: { startDate?: string; endDate?: string } = {};
+        
+        // Only add parameters if they have values
+        if (appliedFilters.startDate && appliedFilters.startDate.trim()) {
+          params.startDate = appliedFilters.startDate.trim();
+        }
+        
+        if (appliedFilters.endDate && appliedFilters.endDate.trim()) {
+          params.endDate = appliedFilters.endDate.trim();
+        }
+        
+        console.log("Calling getStats with params:", params);
+        
+        // Call getStats with safe parameters
+        const result = await backend.ticket.getStats(params);
         console.log("Dashboard stats fetched successfully:", result);
         return result;
       } catch (error) {
@@ -46,13 +76,45 @@ export default function Dashboard() {
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refresh every minute
     refetchOnWindowFocus: true,
-    retry: 3,
+    retry: (failureCount, error: any) => {
+      // Don't retry on client errors (400-499)
+      if (error?.status >= 400 && error?.status < 500) {
+        return false;
+      }
+      return failureCount < 3;
+    },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   const handleRefresh = () => {
     console.log("Manually refreshing dashboard data...");
     refetch();
+  };
+
+  const handleApplyFilters = () => {
+    console.log("Applying date filters:", dateFilters);
+    
+    // Validate date filters
+    if (dateFilters.startDate && dateFilters.endDate) {
+      const startDate = new Date(dateFilters.startDate);
+      const endDate = new Date(dateFilters.endDate);
+      
+      if (startDate > endDate) {
+        console.error("Start date cannot be after end date");
+        return;
+      }
+    }
+    
+    setAppliedFilters({
+      startDate: dateFilters.startDate || undefined,
+      endDate: dateFilters.endDate || undefined,
+    });
+  };
+
+  const handleClearFilters = () => {
+    console.log("Clearing date filters");
+    setDateFilters({ startDate: "", endDate: "" });
+    setAppliedFilters({ startDate: undefined, endDate: undefined });
   };
 
   // Error state
@@ -75,6 +137,9 @@ export default function Dashboard() {
                 <h3 className="text-lg font-medium text-red-800">Failed to load dashboard data</h3>
                 <p className="text-red-600">
                   {error instanceof Error ? error.message : "An error occurred while loading dashboard statistics"}
+                </p>
+                <p className="text-sm text-red-500 mt-2">
+                  Please check your date filters and try again.
                 </p>
               </div>
             </div>
@@ -163,6 +228,65 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Date Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Filter className="w-5 h-5 mr-2" />
+            Date Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="space-y-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={dateFilters.startDate}
+                onChange={(e) => setDateFilters({ ...dateFilters, startDate: e.target.value })}
+                max={dateFilters.endDate || undefined}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="endDate">End Date</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={dateFilters.endDate}
+                onChange={(e) => setDateFilters({ ...dateFilters, endDate: e.target.value })}
+                min={dateFilters.startDate || undefined}
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button onClick={handleApplyFilters} size="sm">
+                <Calendar className="w-4 h-4 mr-2" />
+                Apply
+              </Button>
+              <Button onClick={handleClearFilters} variant="outline" size="sm">
+                Clear
+              </Button>
+            </div>
+            
+            <div className="text-sm text-gray-600">
+              {appliedFilters.startDate || appliedFilters.endDate ? (
+                <div>
+                  <p className="font-medium">Active filters:</p>
+                  {appliedFilters.startDate && <p>From: {new Date(appliedFilters.startDate).toLocaleDateString()}</p>}
+                  {appliedFilters.endDate && <p>To: {new Date(appliedFilters.endDate).toLocaleDateString()}</p>}
+                  {!appliedFilters.startDate && !appliedFilters.endDate && <p>No date filters applied</p>}
+                </div>
+              ) : (
+                <p>No date filters applied</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -260,6 +384,7 @@ export default function Dashboard() {
                 <div className="text-center">
                   <BarChart className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>No trend data available</p>
+                  <p className="text-sm mt-2">Try adjusting your date filters</p>
                 </div>
               </div>
             )}
@@ -297,6 +422,7 @@ export default function Dashboard() {
                 <div className="text-center">
                   <XCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>No tickets to display</p>
+                  <p className="text-sm mt-2">Try adjusting your date filters</p>
                 </div>
               </div>
             )}
@@ -331,6 +457,7 @@ export default function Dashboard() {
               <div className="text-center">
                 <BarChart className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p>No engineer assignment data available</p>
+                <p className="text-sm mt-2">Try adjusting your date filters</p>
               </div>
             </div>
           )}
@@ -346,6 +473,7 @@ export default function Dashboard() {
               <p>Stats loaded: {stats ? 'Yes' : 'No'}</p>
               <p>Trends count: {trends.length}</p>
               <p>Engineer stats count: {engineerStats.length}</p>
+              <p>Applied filters: {JSON.stringify(appliedFilters)}</p>
               <p>Last fetch: {new Date().toLocaleTimeString()}</p>
               <p>Auto-refresh: Every 60 seconds</p>
             </div>

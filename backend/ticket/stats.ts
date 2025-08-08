@@ -23,11 +23,13 @@ export const getStats = api<GetStatsRequest, GetStatsResponse>(
     console.log(`Getting stats for user: ${auth.username} (role: ${auth.role})`);
     console.log("Request parameters:", req);
     
-    // Ensure req is defined and has default values
+    // Safely handle request parameters with defaults
     const requestParams = req || {};
-    const startDate = requestParams.startDate;
+    const startDate = requestParams.startDate || undefined;
     // Default endDate to today if not provided
     const endDate = requestParams.endDate || new Date().toISOString().split('T')[0];
+    
+    console.log("Processed parameters:", { startDate, endDate });
     
     try {
       let whereClause = "WHERE 1=1";
@@ -48,10 +50,10 @@ export const getStats = api<GetStatsRequest, GetStatsResponse>(
       }
       // Admins can see all ticket stats (no additional filtering)
 
-      // Only add date filters if they are provided
+      // Add date filters if they are provided
       if (startDate) {
         whereClause += ` AND created_at >= $${paramIndex}`;
-        params.push(startDate);
+        params.push(startDate + ' 00:00:00'); // Include the entire start date
         paramIndex++;
       }
 

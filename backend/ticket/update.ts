@@ -65,8 +65,10 @@ export const update = api<UpdateTicketRequest, Ticket>(
     }
 
     if (req.assignedEngineer !== undefined) {
+      // Handle "unassigned" value from frontend
+      const assignedEngineer = req.assignedEngineer === "unassigned" ? null : req.assignedEngineer;
       updates.push(`assigned_engineer = $${paramIndex}`);
-      params.push(req.assignedEngineer || null);
+      params.push(assignedEngineer);
       paramIndex++;
     }
 

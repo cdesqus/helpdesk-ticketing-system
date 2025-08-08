@@ -174,7 +174,7 @@ export default function CreateTicket() {
                     <SelectValue placeholder="Select an engineer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {engineers.map((engineer) => (
                       <SelectItem key={engineer.id} value={engineer.name}>
                         {engineer.name}

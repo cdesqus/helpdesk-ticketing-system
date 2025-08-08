@@ -22,6 +22,9 @@ export const create = api<CreateTicketRequest, Ticket>(
     const now = new Date();
     const customDate = req.customDate || now;
     
+    // Handle "unassigned" value from frontend
+    const assignedEngineer = req.assignedEngineer === "unassigned" ? null : req.assignedEngineer;
+    
     const row = await ticketDB.queryRow<{
       id: number;
       subject: string;
@@ -42,7 +45,7 @@ export const create = api<CreateTicketRequest, Ticket>(
         reporter_name, reporter_email, company_name, custom_date, created_at, updated_at
       ) VALUES (
         ${req.subject}, ${req.description}, ${req.status || "Open"}, ${req.priority || "Medium"},
-        ${req.assignedEngineer || null}, ${req.reporterName}, ${req.reporterEmail || null},
+        ${assignedEngineer || null}, ${req.reporterName}, ${req.reporterEmail || null},
         ${req.companyName || null}, ${customDate}, ${customDate}, ${now}
       )
       RETURNING *

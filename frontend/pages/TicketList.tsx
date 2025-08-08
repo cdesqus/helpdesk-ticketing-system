@@ -160,7 +160,7 @@ export default function TicketList() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="In Progress">In Progress</SelectItem>
                 <SelectItem value="Resolved">Resolved</SelectItem>
@@ -173,7 +173,7 @@ export default function TicketList() {
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Priorities</SelectItem>
+                <SelectItem value="all">All Priorities</SelectItem>
                 <SelectItem value="Low">Low</SelectItem>
                 <SelectItem value="Medium">Medium</SelectItem>
                 <SelectItem value="High">High</SelectItem>
@@ -186,7 +186,7 @@ export default function TicketList() {
                 <SelectValue placeholder="Engineer" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Engineers</SelectItem>
+                <SelectItem value="all">All Engineers</SelectItem>
                 {engineers.map((engineer) => (
                   <SelectItem key={engineer.id} value={engineer.name}>
                     {engineer.name}

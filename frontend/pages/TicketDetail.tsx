@@ -86,7 +86,7 @@ export default function TicketDetail() {
         description: ticket.description,
         status: ticket.status,
         priority: ticket.priority,
-        assignedEngineer: ticket.assignedEngineer || "",
+        assignedEngineer: ticket.assignedEngineer || "unassigned",
         reporterName: ticket.reporterName,
         reporterEmail: ticket.reporterEmail || "",
         companyName: ticket.companyName || "",
@@ -109,7 +109,7 @@ export default function TicketDetail() {
         description: ticket.description,
         status: ticket.status,
         priority: ticket.priority,
-        assignedEngineer: ticket.assignedEngineer || "",
+        assignedEngineer: ticket.assignedEngineer || "unassigned",
         reporterName: ticket.reporterName,
         reporterEmail: ticket.reporterEmail || "",
         companyName: ticket.companyName || "",
@@ -132,7 +132,7 @@ export default function TicketDetail() {
 
     const updateData = {
       ...formData,
-      assignedEngineer: formData.assignedEngineer || undefined,
+      assignedEngineer: formData.assignedEngineer === "unassigned" ? undefined : formData.assignedEngineer,
       reporterEmail: formData.reporterEmail || undefined,
       companyName: formData.companyName || undefined,
       customDate: formData.customDate ? new Date(formData.customDate) : undefined,
@@ -345,7 +345,7 @@ export default function TicketDetail() {
                       <SelectValue placeholder="Select an engineer" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {engineers.map((engineer) => (
                         <SelectItem key={engineer.id} value={engineer.name}>
                           {engineer.name}

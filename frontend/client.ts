@@ -521,6 +521,8 @@ export namespace ticket {
                 offset:           params.offset === undefined ? undefined : String(params.offset),
                 priority:         params.priority === undefined ? undefined : String(params.priority),
                 search:           params.search,
+                sortField:        params.sortField === undefined ? undefined : String(params.sortField),
+                sortOrder:        params.sortOrder === undefined ? undefined : String(params.sortOrder),
                 startDate:        params.startDate,
                 status:           params.status === undefined ? undefined : String(params.status),
             })

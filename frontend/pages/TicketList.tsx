@@ -66,7 +66,12 @@ import {
   Square,
   Upload,
   FileSpreadsheet,
-  ChevronDown
+  ChevronDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Hash,
+  Clock
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -80,6 +85,9 @@ const base64ToUint8Array = (base64: string) => {
   }
   return bytes;
 };
+
+type SortField = "id" | "created_at";
+type SortOrder = "asc" | "desc";
 
 export default function TicketList() {
   const { toast } = useToast();
@@ -96,6 +104,10 @@ export default function TicketList() {
   );
   
   const [page, setPage] = useState(0);
+  const [limit, setLimit] = useState(20);
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"excel" | "pdf">("excel");
   const [exportDateRange, setExportDateRange] = useState({
@@ -107,13 +119,13 @@ export default function TicketList() {
   const [selectedTickets, setSelectedTickets] = useState<Set<number>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
-  
-  const limit = 20;
 
   const { data: ticketsData, isLoading, error, refetch, isError } = useQuery({
-    queryKey: ["tickets", search, status, priority, assignedEngineer, page],
+    queryKey: ["tickets", search, status, priority, assignedEngineer, page, limit, sortField, sortOrder],
     queryFn: async () => {
-      console.log("Fetching tickets with params:", { search, status, priority, assignedEngineer, page });
+      console.log("Fetching tickets with params:", { 
+        search, status, priority, assignedEngineer, page, limit, sortField, sortOrder 
+      });
       try {
         const result = await backend.ticket.list({
           search: search || undefined,
@@ -122,6 +134,8 @@ export default function TicketList() {
           assignedEngineer: assignedEngineer === "all" ? "all" : (assignedEngineer === "unassigned" ? "Unassigned" : assignedEngineer),
           limit,
           offset: page * limit,
+          sortField,
+          sortOrder,
         });
         console.log("Tickets fetched successfully:", result);
         return result;
@@ -263,6 +277,32 @@ export default function TicketList() {
     bulkDeleteMutation.mutate(ticketIds);
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle sort order if same field
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // Set new field with default order
+      setSortField(field);
+      setSortOrder(field === "id" ? "desc" : "desc"); // Default to desc for both
+    }
+    setPage(0); // Reset to first page when sorting changes
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(0); // Reset to first page when limit changes
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+    }
+    return sortOrder === "asc" ? 
+      <ArrowUp className="w-4 h-4 text-blue-600" /> : 
+      <ArrowDown className="w-4 h-4 text-blue-600" />;
+  };
+
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case "Urgent": return "destructive";
@@ -294,6 +334,11 @@ export default function TicketList() {
   const allTicketsSelected = tickets.length > 0 && tickets.every(ticket => selectedTickets.has(ticket.id));
   const someTicketsSelected = selectedTickets.size > 0 && !allTicketsSelected;
 
+  // Calculate pagination info
+  const totalPages = Math.ceil(total / limit);
+  const startItem = page * limit + 1;
+  const endItem = Math.min((page + 1) * limit, total);
+
   // Debug information
   console.log("TicketList render state:", {
     isLoading,
@@ -305,7 +350,12 @@ export default function TicketList() {
     userRole: user?.role,
     selectedCount: selectedTickets.size,
     isSelectMode,
-    assignedEngineer
+    assignedEngineer,
+    sortField,
+    sortOrder,
+    limit,
+    page,
+    totalPages
   });
 
   return (
@@ -526,6 +576,9 @@ export default function TicketList() {
               <p>Total tickets: {total}</p>
               <p>Selected tickets: {selectedTickets.size}</p>
               <p>Select mode: {isSelectMode ? 'Yes' : 'No'}</p>
+              <p>Sort: {sortField} {sortOrder}</p>
+              <p>Limit: {limit}</p>
+              <p>Page: {page + 1} of {totalPages}</p>
               <p>Current filters: {JSON.stringify({ search, status, priority, assignedEngineer })}</p>
             </div>
           </CardContent>
@@ -537,151 +590,199 @@ export default function TicketList() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Filter className="w-5 h-5 mr-2" />
-            Filters
+            Filters & Sorting
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search tickets..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            <Select value={status} onValueChange={(value) => setStatus(value as TicketStatus | "all")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="Open">Open</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Resolved">Resolved</SelectItem>
-                <SelectItem value="Closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={priority} onValueChange={(value) => setPriority(value as TicketPriority | "all")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="Low">Low</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-                <SelectItem value="Urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={assignedEngineer} onValueChange={setAssignedEngineer}>
-              <SelectTrigger>
-                <SelectValue placeholder="Engineer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Engineers</SelectItem>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {engineers.map((engineer) => (
-                  <SelectItem key={engineer.id} value={engineer.name}>
-                    {engineer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="flex space-x-2">
-              <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-1" />
-                    Export
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Export Tickets</DialogTitle>
-                    <DialogDescription>
-                      Choose export format and date range for ticket export.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="exportFormat">Export Format</Label>
-                      <Select
-                        value={exportFormat}
-                        onValueChange={(value) => setExportFormat(value as "excel" | "pdf")}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="excel">Excel (.xlsx)</SelectItem>
-                          <SelectItem value="pdf">PDF (Text)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="startDate">Start Date</Label>
-                        <Input
-                          id="startDate"
-                          type="date"
-                          value={exportDateRange.startDate}
-                          onChange={(e) => setExportDateRange({ 
-                            ...exportDateRange, 
-                            startDate: e.target.value 
-                          })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="endDate">End Date</Label>
-                        <Input
-                          id="endDate"
-                          type="date"
-                          value={exportDateRange.endDate}
-                          onChange={(e) => setExportDateRange({ 
-                            ...exportDateRange, 
-                            endDate: e.target.value 
-                          })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                      <p className="text-sm text-blue-800">
-                        <Calendar className="w-4 h-4 inline mr-1" />
-                        Leave date fields empty to export all tickets. Current filters will be applied.
-                      </p>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsExportDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={handleExport}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export {exportFormat.toUpperCase()}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+          <div className="space-y-4">
+            {/* First row: Search and basic filters */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search tickets..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrint}
-              >
-                <Printer className="w-4 h-4 mr-1" />
-                Print
-              </Button>
+              <Select value={status} onValueChange={(value) => setStatus(value as TicketStatus | "all")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="Open">Open</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="Resolved">Resolved</SelectItem>
+                  <SelectItem value="Closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={priority} onValueChange={(value) => setPriority(value as TicketPriority | "all")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={assignedEngineer} onValueChange={setAssignedEngineer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Engineer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Engineers</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {engineers.map((engineer) => (
+                    <SelectItem key={engineer.id} value={engineer.name}>
+                      {engineer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Second row: Sorting and pagination controls */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center space-x-4">
+                <Label className="text-sm font-medium">Sort by:</Label>
+                <div className="flex space-x-2">
+                  <Button
+                    variant={sortField === "id" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleSort("id")}
+                    className="flex items-center space-x-1"
+                  >
+                    <Hash className="w-4 h-4" />
+                    <span>ID</span>
+                    {getSortIcon("id")}
+                  </Button>
+                  <Button
+                    variant={sortField === "created_at" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleSort("created_at")}
+                    className="flex items-center space-x-1"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Date</span>
+                    {getSortIcon("created_at")}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <Label className="text-sm font-medium">Items per page:</Label>
+                <Select value={limit.toString()} onValueChange={(value) => handleLimitChange(parseInt(value))}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="1000">1000</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex space-x-2">
+                <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Download className="w-4 h-4 mr-1" />
+                      Export
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Export Tickets</DialogTitle>
+                      <DialogDescription>
+                        Choose export format and date range for ticket export.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="exportFormat">Export Format</Label>
+                        <Select
+                          value={exportFormat}
+                          onValueChange={(value) => setExportFormat(value as "excel" | "pdf")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="excel">Excel (.xlsx)</SelectItem>
+                            <SelectItem value="pdf">PDF (Text)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="startDate">Start Date</Label>
+                          <Input
+                            id="startDate"
+                            type="date"
+                            value={exportDateRange.startDate}
+                            onChange={(e) => setExportDateRange({ 
+                              ...exportDateRange, 
+                              startDate: e.target.value 
+                            })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="endDate">End Date</Label>
+                          <Input
+                            id="endDate"
+                            type="date"
+                            value={exportDateRange.endDate}
+                            onChange={(e) => setExportDateRange({ 
+                              ...exportDateRange, 
+                              endDate: e.target.value 
+                            })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <p className="text-sm text-blue-800">
+                          <Calendar className="w-4 h-4 inline mr-1" />
+                          Leave date fields empty to export all tickets. Current filters will be applied.
+                        </p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsExportDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleExport}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Export {exportFormat.toUpperCase()}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrint}
+                >
+                  <Printer className="w-4 h-4 mr-1" />
+                  Print
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -690,8 +791,11 @@ export default function TicketList() {
       {/* Tickets Table */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            Tickets ({total} total)
+          <CardTitle className="flex items-center justify-between">
+            <span>Tickets ({total} total)</span>
+            <div className="text-sm text-gray-500">
+              Sorted by {sortField === "id" ? "ID" : "Date"} ({sortOrder === "asc" ? "ascending" : "descending"})
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -754,13 +858,39 @@ export default function TicketList() {
                         />
                       </TableHead>
                     )}
-                    <TableHead>ID</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleSort("id")}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <Hash className="w-4 h-4" />
+                          <span>ID</span>
+                          {getSortIcon("id")}
+                        </div>
+                      </Button>
+                    </TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Priority</TableHead>
                     <TableHead>Reporter</TableHead>
                     <TableHead>Engineer</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleSort("created_at")}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <Clock className="w-4 h-4" />
+                          <span>Created</span>
+                          {getSortIcon("created_at")}
+                        </div>
+                      </Button>
+                    </TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -817,13 +947,27 @@ export default function TicketList() {
             </div>
           )}
 
-          {/* Pagination */}
-          {total > limit && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-gray-700">
-                Showing {page * limit + 1} to {Math.min((page + 1) * limit, total)} of {total} results
-              </p>
-              <div className="flex space-x-2">
+          {/* Enhanced Pagination */}
+          {total > 0 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t">
+              <div className="flex items-center space-x-4">
+                <p className="text-sm text-gray-700">
+                  Showing {startItem} to {endItem} of {total} results
+                </p>
+                <div className="text-sm text-gray-500">
+                  Page {page + 1} of {totalPages}
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(0)}
+                  disabled={page === 0}
+                >
+                  First
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -832,13 +976,50 @@ export default function TicketList() {
                 >
                   Previous
                 </Button>
+                
+                {/* Page numbers */}
+                <div className="flex space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i;
+                    } else if (page < 3) {
+                      pageNum = i;
+                    } else if (page > totalPages - 4) {
+                      pageNum = totalPages - 5 + i;
+                    } else {
+                      pageNum = page - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={page === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum + 1}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(page + 1)}
-                  disabled={(page + 1) * limit >= total}
+                  disabled={page >= totalPages - 1}
                 >
                   Next
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(totalPages - 1)}
+                  disabled={page >= totalPages - 1}
+                >
+                  Last
                 </Button>
               </div>
             </div>

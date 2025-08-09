@@ -13,6 +13,8 @@ export interface ListTicketsRequest {
   endDate?: Query<string>;
   limit?: Query<number>;
   offset?: Query<number>;
+  sortField?: Query<"id" | "created_at">;
+  sortOrder?: Query<"asc" | "desc">;
 }
 
 export interface ListTicketsResponse {
@@ -103,9 +105,24 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
 
       const limit = req.limit || 50;
       const offset = req.offset || 0;
+      const sortField = req.sortField || "created_at";
+      const sortOrder = req.sortOrder || "desc";
+
+      // Validate sort parameters
+      const validSortFields = ["id", "created_at"];
+      const validSortOrders = ["asc", "desc"];
+      
+      if (!validSortFields.includes(sortField)) {
+        throw new Error(`Invalid sort field: ${sortField}`);
+      }
+      
+      if (!validSortOrders.includes(sortOrder)) {
+        throw new Error(`Invalid sort order: ${sortOrder}`);
+      }
 
       console.log(`Query where clause: ${whereClause}`);
       console.log(`Query params:`, params);
+      console.log(`Sort: ${sortField} ${sortOrder}, Limit: ${limit}, Offset: ${offset}`);
 
       // Get total count
       const countQuery = `SELECT COUNT(*) as count FROM tickets ${whereClause}`;
@@ -115,10 +132,10 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
       const total = countResult?.count || 0;
       console.log(`Total tickets found: ${total}`);
 
-      // Get tickets
+      // Get tickets with sorting
       const query = `
         SELECT * FROM tickets ${whereClause}
-        ORDER BY created_at DESC
+        ORDER BY ${sortField} ${sortOrder.toUpperCase()}
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
       params.push(limit, offset);
@@ -214,6 +231,28 @@ export const list = api<ListTicketsRequest, ListTicketsResponse>(
       } else if (auth.role === "reporter") {
         filteredTickets = fallbackTickets.filter(t => t.reporterEmail === auth.email);
       }
+
+      // Apply sorting to fallback tickets
+      const sortField = req.sortField || "created_at";
+      const sortOrder = req.sortOrder || "desc";
+      
+      filteredTickets.sort((a, b) => {
+        let aValue, bValue;
+        
+        if (sortField === "id") {
+          aValue = a.id;
+          bValue = b.id;
+        } else {
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+        }
+        
+        if (sortOrder === "asc") {
+          return aValue - bValue;
+        } else {
+          return bValue - aValue;
+        }
+      });
 
       console.log(`Returning ${filteredTickets.length} fallback tickets due to database error`);
       return { tickets: filteredTickets, total: filteredTickets.length };

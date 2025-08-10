@@ -1,6 +1,6 @@
 version: '3.8'
 
-# Production-specific overrides
+# Production-specific overrides and additional services
 services:
   helpdesk-app:
     build:
@@ -9,7 +9,7 @@ services:
       NODE_ENV: production
       LOG_LEVEL: warn
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '1.0'
@@ -58,7 +58,7 @@ services:
           cpus: '0.1'
           memory: 64M
 
-  # Production monitoring
+  # Production monitoring with Prometheus
   prometheus:
     image: prom/prometheus:latest
     container_name: helpdesk-prometheus
@@ -77,7 +77,14 @@ services:
     networks:
       - helpdesk-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
+  # Grafana for monitoring dashboards
   grafana:
     image: grafana/grafana:latest
     container_name: helpdesk-grafana
@@ -90,12 +97,91 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
     networks:
       - helpdesk-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # Log aggregation with Loki (optional)
+  loki:
+    image: grafana/loki:latest
+    container_name: helpdesk-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./docker/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - helpdesk-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # Promtail for log collection (optional)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: helpdesk-promtail
+    volumes:
+      - nginx_logs:/var/log/nginx:ro
+      - app_logs:/var/log/app:ro
+      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - helpdesk-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  # Node Exporter for system metrics (optional)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: helpdesk-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - helpdesk-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
 
 volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  loki_data:
     driver: local

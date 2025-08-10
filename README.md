@@ -1,6 +1,6 @@
 # IDESOLUSI Helpdesk System
 
-A comprehensive helpdesk management system built with **Encore.ts** backend and **React** frontend, featuring role-based access control, ticket management, real-time communication, and secure email notifications.
+A comprehensive helpdesk management system built with **Encore.ts** backend and **React** frontend, featuring role-based access control, ticket management, real-time communication, and secure email notifications. Designed for easy self-hosting with Docker.
 
 ## 🌟 Features
 
@@ -63,12 +63,14 @@ A comprehensive helpdesk management system built with **Encore.ts** backend and 
 - **XSS protection headers** and CSRF protection
 - **Secure email delivery** with encryption monitoring
 
-## 🚀 Quick Start
+## 🚀 Quick Start for Self-Hosting
 
 ### Prerequisites
 - **Docker** (v20.10 or higher)
 - **Docker Compose** (v2.0 or higher)
 - **Git** for cloning the repository
+- **2GB RAM** minimum (4GB recommended)
+- **5GB disk space** minimum (20GB recommended)
 
 ### 🛠️ Installation
 
@@ -85,133 +87,49 @@ A comprehensive helpdesk management system built with **Encore.ts** backend and 
    ```
    
    The setup script will:
-   - Check system requirements
-   - Generate SSL certificates for development
-   - Create secure environment configuration
+   - Check system requirements and dependencies
+   - Generate secure passwords and JWT secrets
+   - Create SSL certificates for HTTPS
    - Set up monitoring and backup automation
    - Configure proper file permissions
+   - Create systemd service (optional)
 
-3. **Start the application**
+3. **Deploy the application**
    ```bash
-   docker-compose up -d
+   ./scripts/deploy.sh
    ```
 
 4. **Access the application**
    - **Main application**: http://localhost
-   - **HTTPS (development)**: https://localhost (self-signed certificate)
-   - **PgAdmin**: http://localhost:8080 (admin@helpdesk.local / admin123)
-   - **Redis Commander**: http://localhost:8081
+   - **HTTPS**: https://localhost (self-signed certificate)
+   - **Monitoring (Grafana)**: http://localhost:3001
+   - **Metrics (Prometheus)**: http://localhost:9090
 
 ### 🔑 Default Credentials
 - **Admin 1**: `admin` / `admin123`
 - **Admin 2**: `haryanto` / `P@ssw0rd`
+- **Grafana**: `admin` / `[generated password in .env]`
 
-Both accounts have full administrative access to the system.
+## 🏗️ Self-Hosting Configuration
 
-## 🏗️ Development
-
-### Development Environment Setup
-
-1. **Start development services**
-   ```bash
-   docker-compose -f docker-compose.dev.yml up -d
-   ```
-
-2. **Install dependencies**
-   ```bash
-   # Backend (Encore.ts)
-   cd backend && npm install
-   
-   # Frontend (React + Vite)
-   cd frontend && npm install
-   ```
-
-3. **Run in development mode**
-   ```bash
-   # Backend (Encore.ts with hot reload)
-   cd backend && encore run --watch
-   
-   # Frontend (Vite with hot reload)
-   cd frontend && npm run dev
-   ```
-
-### 📁 Project Structure
-
-```
-helpdesk-system/
-├── backend/                    # Encore.ts backend services
-│   ├── auth/                  # Authentication service
-│   │   ├── encore.service.ts  # Service definition
-│   │   ├── login.ts          # Login/logout endpoints
-│   │   ├── users.ts          # User management
-│   │   ├── auth.ts           # Auth handler & middleware
-│   │   └── migrations/       # Database migrations
-│   ├── ticket/               # Ticket management service
-│   │   ├── encore.service.ts # Service definition
-│   │   ├── create.ts         # Create tickets
-│   │   ├── list.ts           # List/filter tickets
-│   │   ├── get.ts            # Get ticket details
-│   │   ├── update.ts         # Update tickets
-│   │   ├── delete.ts         # Delete tickets
-│   │   ├── comments.ts       # Comment management
-│   │   ├── bulk-import.ts    # Excel import functionality
-│   │   ├── export.ts         # Export to Excel/PDF
-│   │   ├── email.ts          # Email notifications
-│   │   ├── smtp.ts           # SMTP configuration
-│   │   ├── stats.ts          # Analytics & reporting
-│   │   └── migrations/       # Database migrations
-│   └── ...
-├── frontend/                  # React frontend application
-│   ├── components/           # Reusable UI components
-│   │   ├── Layout.tsx        # Main layout wrapper
-│   │   ├── ProtectedRoute.tsx # Route protection
-│   │   ├── CommentSection.tsx # Ticket comments
-│   │   └── SystemLogo.tsx    # Branding component
-│   ├── pages/                # Page components
-│   │   ├── Landing.tsx       # Landing page
-│   │   ├── Login.tsx         # Authentication
-│   │   ├── Dashboard.tsx     # Analytics dashboard
-│   │   ├── TicketList.tsx    # Ticket management
-│   │   ├── TicketDetail.tsx  # Ticket details
-│   │   ├── CreateTicket.tsx  # Ticket creation
-│   │   ├── BulkImport.tsx    # Excel import
-│   │   ├── UserManagement.tsx # User administration
-│   │   └── Settings.tsx      # System configuration
-│   ├── hooks/                # Custom React hooks
-│   │   ├── useAuth.tsx       # Authentication logic
-│   │   └── useSystemConfig.tsx # System configuration
-│   └── App.tsx               # Main application component
-├── docker/                   # Docker configuration
-│   ├── nginx/               # Nginx reverse proxy
-│   ├── postgres/            # Database initialization
-│   ├── prometheus/          # Monitoring configuration
-│   └── grafana/             # Dashboard configuration
-├── scripts/                 # Utility scripts
-│   ├── setup.sh            # Automated setup
-│   ├── deploy.sh           # Production deployment
-│   ├── backup.sh           # Manual backup
-│   └── restore.sh          # Backup restoration
-├── docker-compose.yml      # Production configuration
-├── docker-compose.dev.yml  # Development configuration
-├── docker-compose.prod.yml # Production overrides
-└── README.md               # This documentation
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
+### Environment Configuration
 
 The system uses a comprehensive `.env` file for configuration. Key variables include:
 
 ```env
 # Database Configuration
-DATABASE_URL=postgres://helpdesk_user:helpdesk_password@postgres:5432/helpdesk
+POSTGRES_PASSWORD=secure_generated_password
+DATABASE_URL=postgres://helpdesk_user:password@postgres:5432/helpdesk
 
 # Redis Configuration  
-REDIS_URL=redis://:helpdesk_redis_password@redis:6379
+REDIS_PASSWORD=secure_generated_password
+REDIS_URL=redis://:password@redis:6379
 
 # Security
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+JWT_SECRET=secure_generated_jwt_secret
+
+# Domain Configuration
+DOMAIN_NAME=helpdesk.your-domain.com
 
 # SMTP Email (Optional)
 SMTP_HOST=smtp.gmail.com
@@ -219,36 +137,252 @@ SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 
-# Application Settings
-NODE_ENV=production
-PORT=4000
-
-# Backup Configuration
-BACKUP_RETENTION_DAYS=30
+# Monitoring
+GRAFANA_PASSWORD=secure_generated_password
 ```
 
-### System Configuration
+### SSL/TLS Configuration
 
-Access the **Settings** page as an admin to configure:
+#### Development (Self-Signed Certificates)
+The setup script automatically generates self-signed certificates for development:
+```bash
+# Certificates are created in docker/nginx/ssl/
+docker/nginx/ssl/cert.pem
+docker/nginx/ssl/key.pem
+```
 
-- **🎨 System Branding**: Logo, name, colors with live preview
-- **📧 SMTP Settings**: Secure email notifications with SSL/TLS
-- **👥 User Management**: Create and manage user accounts
-- **📊 Email Monitoring**: Delivery statistics and logs
+#### Production (Let's Encrypt)
+For production with a real domain:
 
-### SMTP Configuration
+1. **Install Certbot**
+   ```bash
+   sudo apt update
+   sudo apt install certbot
+   ```
 
-The system supports secure email delivery with multiple providers:
+2. **Get SSL Certificate**
+   ```bash
+   sudo certbot certonly --standalone -d your-domain.com
+   ```
 
-#### Gmail Configuration
+3. **Copy Certificates**
+   ```bash
+   sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem docker/nginx/ssl/cert.pem
+   sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem docker/nginx/ssl/key.pem
+   sudo chown $USER:$USER docker/nginx/ssl/*.pem
+   ```
+
+4. **Set up Auto-Renewal**
+   ```bash
+   sudo crontab -e
+   # Add: 0 12 * * * /usr/bin/certbot renew --quiet --deploy-hook "cd /path/to/helpdesk && docker-compose restart nginx"
+   ```
+
+### Firewall Configuration
+
+#### Ubuntu/Debian (UFW)
+```bash
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 80/tcp    # HTTP
+sudo ufw allow 443/tcp   # HTTPS
+sudo ufw enable
+```
+
+#### CentOS/RHEL (Firewalld)
+```bash
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
+```
+
+#### Cloud Providers
+Configure security groups to allow:
+- Port 22 (SSH) from your IP
+- Port 80 (HTTP) from anywhere
+- Port 443 (HTTPS) from anywhere
+
+### Domain Setup
+
+1. **Point DNS to your server**
+   ```
+   A record: your-domain.com → your-server-ip
+   CNAME: www.your-domain.com → your-domain.com
+   ```
+
+2. **Update environment file**
+   ```bash
+   # Edit .env file
+   DOMAIN_NAME=your-domain.com
+   ```
+
+3. **Redeploy**
+   ```bash
+   ./scripts/deploy.sh
+   ```
+
+## 📊 Monitoring and Maintenance
+
+### Built-in Monitoring
+
+The system includes comprehensive monitoring:
+
+- **Grafana Dashboard**: http://localhost:3001
+  - Application metrics and performance
+  - System resource usage
+  - Database and Redis metrics
+  - Custom dashboards
+
+- **Prometheus Metrics**: http://localhost:9090
+  - Time-series metrics collection
+  - Alerting capabilities
+  - Service discovery
+
+- **Log Aggregation**: Available with Loki (optional)
+  - Centralized log collection
+  - Log search and filtering
+  - Integration with Grafana
+
+### Health Monitoring
+
+```bash
+# Check service health
+docker-compose ps
+
+# View application logs
+docker-compose logs -f helpdesk-app
+
+# Monitor resource usage
+docker stats
+
+# Check disk usage
+df -h
+```
+
+### Automated Backups
+
+Backups run automatically daily at 2 AM:
+
+```bash
+# Manual backup
+./scripts/backup.sh
+
+# Restore from backup
+./scripts/restore.sh 20241201_143000
+
+# List available backups
+ls -la backups/
+```
+
+### System Updates
+
+```bash
+# Update application
+./scripts/deploy.sh
+
+# Update Docker images
+docker-compose pull
+./scripts/deploy.sh
+
+# Enable automatic updates (optional)
+docker-compose --profile watchtower up -d
+```
+
+## 🔧 Advanced Configuration
+
+### Scaling and Performance
+
+#### Horizontal Scaling
+```bash
+# Scale application instances
+docker-compose up -d --scale helpdesk-app=3
+```
+
+#### Resource Limits
+Edit `docker-compose.prod.yml` to adjust resource limits:
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '2.0'
+      memory: 2G
+    reservations:
+      cpus: '1.0'
+      memory: 1G
+```
+
+#### Database Optimization
+```bash
+# Connect to database
+docker-compose exec postgres psql -U helpdesk_user helpdesk
+
+# Check performance
+SELECT * FROM pg_stat_activity;
+SELECT * FROM pg_stat_database;
+```
+
+### Cloud Storage Integration
+
+#### AWS S3 Backup
+```env
+# Add to .env file
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_S3_BUCKET=your-backup-bucket
+AWS_REGION=us-east-1
+```
+
+#### Google Cloud Storage
+```env
+# Add to .env file
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_CLOUD_BUCKET=your-backup-bucket
+```
+
+### Reverse Proxy Setup
+
+#### Nginx (External)
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location / {
+        proxy_pass http://localhost:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+#### Cloudflare
+1. Add your domain to Cloudflare
+2. Set DNS A record to your server IP
+3. Enable SSL/TLS encryption
+4. Configure firewall rules
+
+### Email Configuration
+
+#### Gmail with App Password
 ```env
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password  # Use App Password, not regular password
+SMTP_PASS=your-16-character-app-password
 ```
 
-#### Office 365 Configuration
+#### Office 365
 ```env
 SMTP_HOST=smtp.office365.com
 SMTP_PORT=587
@@ -256,455 +390,176 @@ SMTP_USER=your-email@company.com
 SMTP_PASS=your-password
 ```
 
-#### Custom SMTP Configuration
+#### Custom SMTP
 ```env
 SMTP_HOST=mail.your-domain.com
-SMTP_PORT=587  # or 465 for SSL
+SMTP_PORT=587
 SMTP_USER=helpdesk@your-domain.com
 SMTP_PASS=your-password
 ```
-
-**Security Features:**
-- **TLS/STARTTLS encryption** (Port 587) - Recommended
-- **SSL encryption** (Port 465) - Legacy but secure
-- **Connection verification** before sending
-- **Delivery tracking** with success/failure logs
-- **Automatic retry** on temporary failures
-
-## 👥 User Roles & Permissions
-
-### 🔴 Admin
-- **Full system access** and configuration
-- **User management** (create, edit, delete users)
-- **System configuration** (branding, SMTP, settings)
-- **All ticket operations** (create, edit, delete, assign)
-- **Analytics and reporting** access
-- **Bulk operations** (import, export, delete)
-
-### 🔵 Engineer  
-- **View assigned tickets** with full details
-- **Update ticket status** and add resolutions
-- **Add comments** (internal and external)
-- **Limited ticket access** (only assigned tickets by default)
-- **Dashboard access** for assigned ticket metrics
-
-### 🟢 Reporter
-- **Create new tickets** for issues and requests
-- **View own tickets** (read-only access)
-- **Add comments** to own tickets (external only)
-- **Track ticket progress** and updates
-- **Receive email notifications** for ticket updates
-
-## 📡 API Documentation
-
-The system provides a comprehensive RESTful API built with Encore.ts:
-
-### Authentication Endpoints
-```
-POST /auth/login              # User authentication
-POST /auth/logout             # Session termination
-POST /auth/forgot-password    # Password reset request
-POST /auth/reset-password     # Password reset with token
-GET  /auth/me                 # Current user information
-POST /auth/refresh            # Session refresh
-```
-
-### Ticket Management
-```
-GET    /tickets               # List tickets (role-based filtering)
-POST   /tickets               # Create new ticket
-GET    /tickets/:id           # Get ticket details
-PUT    /tickets/:id           # Update ticket
-DELETE /tickets/:id           # Delete ticket (admin only)
-POST   /tickets/:id/close     # Close ticket with resolution
-GET    /tickets/stats         # Analytics and statistics
-GET    /tickets/export        # Export tickets (Excel/PDF)
-POST   /tickets/bulk-import   # Import from Excel
-DELETE /tickets/bulk          # Bulk delete tickets
-```
-
-### Comment System
-```
-GET    /tickets/:id/comments  # List ticket comments
-POST   /tickets/:id/comments  # Add comment to ticket
-PUT    /comments/:id          # Update comment
-DELETE /comments/:id          # Delete comment
-```
-
-### User Management (Admin Only)
-```
-GET    /auth/users            # List all users
-POST   /auth/users            # Create new user
-PUT    /auth/users/:id        # Update user
-DELETE /auth/users/:id        # Delete user
-POST   /auth/users/:id/password # Change user password
-```
-
-### System Configuration
-```
-GET    /system/config         # Get system configuration
-PUT    /system/config         # Update system configuration (admin only)
-GET    /smtp/config           # Get SMTP configuration
-POST   /smtp/configure        # Configure SMTP settings
-POST   /smtp/test             # Test SMTP configuration
-```
-
-### Email Monitoring
-```
-GET    /email-logs            # List email delivery logs
-GET    /email-stats           # Email delivery statistics
-DELETE /email-logs/cleanup    # Clear old email logs
-```
-
-All endpoints support:
-- **JWT authentication** with automatic token refresh
-- **Role-based access control** with granular permissions
-- **Input validation** and sanitization
-- **Error handling** with descriptive messages
-- **Rate limiting** for security
-
-## 🗄️ Backup and Restore
-
-### Automated Backups
-
-The system includes automated backup functionality:
-
-```bash
-# Backups run automatically via cron (daily at 2 AM)
-# Retention: 30 days (configurable)
-# Includes: Database, uploaded files, configuration
-```
-
-### Manual Backup
-```bash
-./scripts/backup.sh
-```
-
-Creates timestamped backups including:
-- **Database dump** (PostgreSQL)
-- **Uploaded files** (if any)
-- **Configuration files** (excluding secrets)
-
-### Restore from Backup
-```bash
-./scripts/restore.sh <backup_timestamp>
-# Example: ./scripts/restore.sh 20241201_143000
-```
-
-### Backup Storage Locations
-- **Local**: `backups/` directory
-- **Cloud**: Optional S3 integration (configurable)
-- **Retention**: Configurable cleanup of old backups
-
-## 🔒 Security Features
-
-### Authentication & Authorization
-- **JWT-based authentication** with secure token management
-- **Role-based access control** with granular permissions
-- **Session management** with automatic refresh
-- **Password hashing** using bcrypt with salt
-- **Account lockout** protection against brute force
-
-### Network Security
-- **HTTPS/TLS encryption** for all communications
-- **Rate limiting** on API endpoints
-- **CORS protection** with configurable origins
-- **Security headers** (HSTS, CSP, X-Frame-Options)
-- **SQL injection prevention** with parameterized queries
-
-### Data Protection
-- **XSS protection** with input sanitization
-- **CSRF protection** with token validation
-- **Secure cookie handling** with HttpOnly flags
-- **Database encryption** at rest (configurable)
-- **Audit logging** for security events
-
-### Email Security
-- **TLS/SSL encryption** for SMTP connections
-- **Connection verification** before sending
-- **Delivery tracking** with failure analysis
-- **Secure credential storage** with environment variables
-
-## 📊 Monitoring and Logging
-
-### Application Monitoring
-- **Health check endpoints** for service monitoring
-- **Performance metrics** collection
-- **Error tracking** and alerting
-- **Resource usage** monitoring
-
-### Logging System
-- **Structured logging** with JSON format
-- **Log rotation** and retention policies
-- **Error aggregation** and analysis
-- **Security event logging**
-
-### Available Logs
-```bash
-# Application logs
-docker-compose logs -f helpdesk-app
-
-# Database logs  
-docker-compose logs -f postgres
-
-# Nginx access/error logs
-docker-compose logs -f nginx
-
-# All services
-docker-compose logs -f
-```
-
-### Monitoring Tools (Production)
-- **Prometheus**: Metrics collection and alerting
-- **Grafana**: Dashboard and visualization
-- **Health checks**: Automated service monitoring
-- **Log aggregation**: Centralized log management
-
-## 🚀 Deployment
-
-### Development Deployment
-```bash
-# Start development environment
-docker-compose -f docker-compose.dev.yml up -d
-
-# With hot reload for development
-cd backend && encore run --watch
-cd frontend && npm run dev
-```
-
-### Production Deployment
-
-1. **Prepare environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with production values
-   ```
-
-2. **Configure SSL certificates**
-   ```bash
-   # Place your SSL certificates in docker/nginx/ssl/
-   cp your-cert.pem docker/nginx/ssl/cert.pem
-   cp your-key.pem docker/nginx/ssl/key.pem
-   ```
-
-3. **Deploy with automated script**
-   ```bash
-   ./scripts/deploy.sh
-   ```
-
-The deployment script handles:
-- **Pre-deployment backup** creation
-- **Health checks** and validation
-- **Graceful service restart** with zero downtime
-- **Post-deployment verification**
-- **Rollback capability** if issues occur
-
-### Scaling and High Availability
-
-```bash
-# Horizontal scaling
-docker-compose up -d --scale helpdesk-app=3
-
-# Load balancer configuration
-# Nginx automatically distributes load across instances
-
-# Database replication (advanced)
-# Configure PostgreSQL master-slave replication
-```
-
-### Production Checklist
-
-- [ ] **Update default passwords** in .env file
-- [ ] **Configure SMTP settings** for email notifications  
-- [ ] **Replace self-signed SSL** certificates with valid ones
-- [ ] **Set up monitoring** and alerting
-- [ ] **Configure backup** retention and storage
-- [ ] **Review security headers** in nginx.conf
-- [ ] **Set up log rotation** and monitoring
-- [ ] **Configure firewall** rules and access controls
 
 ## 🛠️ Troubleshooting
 
 ### Common Issues
 
-#### 🔴 Database Connection Errors
+#### Port Already in Use
 ```bash
-# Check PostgreSQL container status
-docker-compose ps postgres
+# Check what's using the port
+sudo netstat -tulpn | grep :80
+sudo lsof -i :80
 
-# View database logs
+# Stop conflicting services
+sudo systemctl stop apache2
+sudo systemctl stop nginx
+```
+
+#### Database Connection Issues
+```bash
+# Check database logs
 docker-compose logs postgres
 
-# Verify DATABASE_URL in .env file
-grep DATABASE_URL .env
-
-# Restart database service
-docker-compose restart postgres
+# Reset database
+docker-compose down
+docker volume rm helpdesk_postgres_data
+docker-compose up -d
 ```
 
-#### 📧 Email Notifications Not Working
+#### SSL Certificate Issues
 ```bash
-# Check SMTP configuration in Settings page
-# Verify SMTP credentials and settings
+# Regenerate certificates
+rm docker/nginx/ssl/*
+./scripts/setup.sh
 
-# Test SMTP connection
-# Use the "Test Email" feature in Settings
-
-# Check email logs for errors
-# View Email Logs tab in Settings
+# Check certificate validity
+openssl x509 -in docker/nginx/ssl/cert.pem -text -noout
 ```
 
-#### 🔒 Authentication Issues
+#### Memory Issues
 ```bash
-# Clear browser cache and cookies
-# Check JWT_SECRET in .env file
-
-# Restart application services
-docker-compose restart helpdesk-app
-
-# Check authentication logs
-docker-compose logs helpdesk-app | grep auth
-```
-
-#### 📁 File Upload Issues
-```bash
-# Check uploads directory permissions
-ls -la uploads/
-
-# Verify nginx configuration
-docker-compose logs nginx
-
-# Check disk space
-df -h
-```
-
-### Performance Optimization
-
-#### Database Performance
-```sql
--- Check slow queries
-SELECT query, mean_time, calls 
-FROM pg_stat_statements 
-ORDER BY mean_time DESC LIMIT 10;
-
--- Analyze table statistics
-ANALYZE tickets;
-ANALYZE ticket_comments;
-```
-
-#### Application Performance
-```bash
-# Monitor resource usage
+# Check memory usage
+free -h
 docker stats
 
-# Check memory usage
-docker-compose exec helpdesk-app free -h
-
-# Monitor response times
-curl -w "@curl-format.txt" -o /dev/null -s http://localhost/health
+# Increase swap space
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
 ```
 
 ### Log Analysis
 
-#### Application Logs
 ```bash
-# Filter error logs
-docker-compose logs helpdesk-app | grep ERROR
+# Application logs
+docker-compose logs -f helpdesk-app
 
-# Monitor real-time logs
-docker-compose logs -f --tail=100 helpdesk-app
+# Database logs
+docker-compose logs -f postgres
 
-# Export logs for analysis
-docker-compose logs helpdesk-app > app-logs.txt
+# Nginx logs
+docker-compose logs -f nginx
+
+# System logs
+journalctl -u docker
 ```
 
-#### Email Delivery Logs
-```bash
-# Check email delivery status
-# Access Settings > Email Logs in the web interface
-
-# Monitor SMTP connection issues
-docker-compose logs helpdesk-app | grep SMTP
-```
-
-### Health Checks
+### Performance Optimization
 
 ```bash
-# Application health
-curl http://localhost/health
+# Clean up Docker resources
+docker system prune -a
 
-# Database connectivity
-docker-compose exec postgres pg_isready -U helpdesk_user
+# Optimize database
+docker-compose exec postgres psql -U helpdesk_user helpdesk -c "VACUUM ANALYZE;"
 
-# Redis connectivity  
-docker-compose exec redis redis-cli ping
-
-# Nginx status
-curl http://localhost:8080/nginx-status
+# Monitor performance
+docker stats --no-stream
 ```
 
-## 🤝 Contributing
+## 🔒 Security Best Practices
 
-We welcome contributions to improve the IDESOLUSI Helpdesk System!
+### Production Security Checklist
 
-### Development Setup
-1. **Fork the repository** on your preferred Git platform
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Set up development environment** using the instructions above
-4. **Make your changes** with proper testing
-5. **Add tests** if applicable (frontend and backend)
-6. **Commit your changes** (`git commit -m 'Add amazing feature'`)
-7. **Push to the branch** (`git push origin feature/amazing-feature`)
-8. **Submit a pull request** with detailed description
+- [ ] **Change all default passwords**
+- [ ] **Use strong, unique passwords for all services**
+- [ ] **Enable firewall and configure security groups**
+- [ ] **Use valid SSL certificates (not self-signed)**
+- [ ] **Keep system and Docker images updated**
+- [ ] **Configure automated backups**
+- [ ] **Set up monitoring and alerting**
+- [ ] **Review and audit user access regularly**
+- [ ] **Enable fail2ban for SSH protection**
+- [ ] **Configure log rotation and retention**
 
-### Code Standards
-- **TypeScript** for both frontend and backend
-- **ESLint** and **Prettier** for code formatting
-- **Conventional commits** for commit messages
-- **Component-based architecture** for React frontend
-- **Service-oriented architecture** for Encore.ts backend
+### Security Monitoring
 
-### Testing Guidelines
-- **Unit tests** for business logic
-- **Integration tests** for API endpoints
-- **E2E tests** for critical user flows
-- **Security testing** for authentication and authorization
+```bash
+# Check for failed login attempts
+docker-compose logs helpdesk-app | grep "authentication failed"
+
+# Monitor unusual activity
+docker-compose logs nginx | grep "404\|403\|500"
+
+# Check system security
+sudo lynis audit system
+```
+
+## 📋 Maintenance Schedule
+
+### Daily
+- [ ] Check application health
+- [ ] Review error logs
+- [ ] Monitor disk space
+
+### Weekly
+- [ ] Review backup integrity
+- [ ] Check security updates
+- [ ] Monitor performance metrics
+
+### Monthly
+- [ ] Update Docker images
+- [ ] Review user access
+- [ ] Clean up old logs and backups
+- [ ] Security audit
+
+## 🆘 Support and Documentation
+
+### Getting Help
+
+1. **Check the logs** for error messages
+2. **Review this documentation** for configuration options
+3. **Search existing issues** in the repository
+4. **Create a detailed issue** with:
+   - System information (OS, Docker version)
+   - Steps to reproduce the problem
+   - Error messages and logs
+   - Configuration details (without sensitive data)
+
+### Useful Commands
+
+```bash
+# Quick health check
+curl -f http://localhost/health
+
+# Full system status
+./scripts/deploy.sh --check
+
+# Emergency stop
+docker-compose down
+
+# Emergency backup
+./scripts/backup.sh
+
+# View all containers
+docker-compose ps
+
+# Resource usage
+docker stats --no-stream
+```
 
 ## 📄 License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-For support, questions, or feature requests:
-
-- **📧 Email**: Create an issue in the repository
-- **📖 Documentation**: Check this README and inline code comments
-- **🐛 Bug Reports**: Use the issue tracker with detailed reproduction steps
-- **💡 Feature Requests**: Submit enhancement proposals via issues
-- **🔧 Troubleshooting**: Review the troubleshooting section above
-
-### Getting Help
-
-1. **Check the documentation** in this README
-2. **Search existing issues** for similar problems
-3. **Review logs** using the troubleshooting guide
-4. **Create a detailed issue** with:
-   - System information (OS, Docker version)
-   - Steps to reproduce the problem
-   - Expected vs actual behavior
-   - Relevant log excerpts
-   - Screenshots if applicable
-
-## 🙏 Acknowledgments
-
-- **Encore.ts** - Modern TypeScript backend framework
-- **React** - Frontend user interface library
-- **PostgreSQL** - Reliable database system
-- **Docker** - Containerization platform
-- **Nginx** - High-performance web server
-- **Tailwind CSS** - Utility-first CSS framework
-- **shadcn/ui** - Beautiful UI component library
 
 ---
 
@@ -718,39 +573,44 @@ For support, questions, or feature requests:
 
 ### Essential Commands
 ```bash
-# Start application
-docker-compose up -d
+# Initial setup
+./scripts/setup.sh
 
-# Stop application  
-docker-compose down
+# Deploy application
+./scripts/deploy.sh
 
 # View logs
 docker-compose logs -f
 
+# Stop application
+docker-compose down
+
 # Backup data
 ./scripts/backup.sh
 
-# Deploy to production
-./scripts/deploy.sh
-
-# Development mode
-docker-compose -f docker-compose.dev.yml up -d
+# Restore data
+./scripts/restore.sh <timestamp>
 ```
 
 ### Default Access URLs
 - **Application**: http://localhost
-- **HTTPS**: https://localhost  
-- **PgAdmin**: http://localhost:8080
-- **Redis Commander**: http://localhost:8081
-- **Grafana** (prod): http://localhost:3001
-- **Prometheus** (prod): http://localhost:9090
+- **HTTPS**: https://localhost
+- **Grafana**: http://localhost:3001
+- **Prometheus**: http://localhost:9090
 
 ### Default Credentials
 - **Admin**: admin / admin123
 - **Admin**: haryanto / P@ssw0rd
-- **PgAdmin**: admin@helpdesk.local / admin123
+- **Grafana**: admin / [check .env file]
 
-### Support Contacts
-- **Technical Issues**: Create repository issue
-- **Security Concerns**: Contact maintainers directly
-- **Feature Requests**: Submit enhancement proposal
+### Important Files
+- **Configuration**: `.env`
+- **SSL Certificates**: `docker/nginx/ssl/`
+- **Backups**: `backups/`
+- **Logs**: `logs/`
+- **Uploads**: `uploads/`
+
+### Support
+- **Documentation**: This README file
+- **Issues**: Repository issue tracker
+- **Security**: Contact maintainers directly

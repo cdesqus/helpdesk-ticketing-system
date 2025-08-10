@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: helpdesk
       POSTGRES_USER: helpdesk_user
-      POSTGRES_PASSWORD: helpdesk_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helpdesk_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -22,12 +22,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   # Redis for caching and sessions
   redis:
     image: redis:7-alpine
     container_name: helpdesk-redis
-    command: redis-server --appendonly yes --requirepass helpdesk_redis_password
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-helpdesk_redis_password}
     ports:
       - "6379:6379"
     volumes:
@@ -36,10 +42,16 @@ services:
       - helpdesk-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "helpdesk_redis_password", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-helpdesk_redis_password}", "ping"]
       interval: 30s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
   # Helpdesk Application
   helpdesk-app:
@@ -50,10 +62,10 @@ services:
     container_name: helpdesk-app
     environment:
       # Database configuration
-      DATABASE_URL: postgres://helpdesk_user:helpdesk_password@postgres:5432/helpdesk
+      DATABASE_URL: postgres://helpdesk_user:${POSTGRES_PASSWORD:-helpdesk_password}@postgres:5432/helpdesk
       
       # Redis configuration
-      REDIS_URL: redis://:helpdesk_redis_password@redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:-helpdesk_redis_password}@redis:6379
       
       # JWT Secret
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
@@ -67,6 +79,9 @@ services:
       # Application settings
       NODE_ENV: production
       PORT: 4000
+      
+      # Domain configuration for production
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
       
     ports:
       - "4000:4000"
@@ -87,6 +102,12 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   # Nginx Reverse Proxy
   nginx:
@@ -111,13 +132,20 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
 
   # Database backup service
   db-backup:
     image: postgres:15-alpine
     container_name: helpdesk-backup
     environment:
-      PGPASSWORD: helpdesk_password
+      PGPASSWORD: ${POSTGRES_PASSWORD:-helpdesk_password}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
     volumes:
       - ./backups:/backups
       - ./scripts/backup-cron.sh:/backup-cron.sh:ro
@@ -131,6 +159,33 @@ services:
     networks:
       - helpdesk-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  # Watchtower for automatic updates (optional)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: helpdesk-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=86400  # Check daily
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - WATCHTOWER_REVIVE_STOPPED=false
+    restart: unless-stopped
+    profiles:
+      - watchtower  # Only start with --profile watchtower
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
 
 volumes:
   postgres_data:

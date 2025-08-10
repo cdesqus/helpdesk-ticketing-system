@@ -54,10 +54,11 @@ RUN apk add --no-cache \
     postgresql-client \
     redis \
     tzdata \
-    ca-certificates
+    ca-certificates \
+    dumb-init
 
 # Set timezone
-ENV TZ=Asia/Jakarta
+ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
@@ -88,8 +89,9 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
 
-# Start the application
+# Start the application with dumb-init
 WORKDIR /app/backend
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["encore", "run", "--port", "4000", "--listen", "0.0.0.0:4000"]
 
 # Stage 4: Development image
@@ -104,7 +106,8 @@ RUN apk add --no-cache \
     git \
     python3 \
     make \
-    g++
+    g++ \
+    dumb-init
 
 WORKDIR /app
 
@@ -127,5 +130,6 @@ USER encore
 # Expose ports
 EXPOSE 4000 3000
 
-# Development command
+# Development command with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["sh", "-c", "cd backend && encore run --port 4000 --listen 0.0.0.0:4000"]

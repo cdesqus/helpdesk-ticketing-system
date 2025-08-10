@@ -189,8 +189,9 @@ export default function Dashboard() {
 
   const statusData = [
     { name: "Open", value: currentStats.open, color: "#ef4444" },
-    { name: "Resolved", value: currentStats.resolved, color: "#f59e0b" },
-    { name: "Closed", value: currentStats.closed, color: "#10b981" },
+    { name: "In Progress", value: currentStats.inProgress, color: "#f59e0b" },
+    { name: "Resolved", value: currentStats.resolved, color: "#10b981" },
+    { name: "Closed", value: currentStats.closed, color: "#6b7280" },
   ].filter(item => item.value > 0); // Only show non-zero values
 
   // Prepare trends data (reverse to show chronologically)
@@ -258,9 +259,9 @@ export default function Dashboard() {
                 <TrendingUp className="h-8 w-8 text-yellow-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Resolved</p>
+                <p className="text-sm font-medium text-gray-500">In Progress</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {currentStats.resolved}
+                  {currentStats.inProgress}
                 </p>
               </div>
             </div>
@@ -274,9 +275,9 @@ export default function Dashboard() {
                 <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Closed</p>
+                <p className="text-sm font-medium text-gray-500">Resolved</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {currentStats.closed}
+                  {currentStats.resolved}
                 </p>
               </div>
             </div>
@@ -406,37 +407,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Stats Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-blue-600">{currentStats.total}</p>
-              <p className="text-sm text-gray-600">Total Tickets</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-600">{currentStats.open}</p>
-              <p className="text-sm text-gray-600">Need Attention</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-yellow-600">{currentStats.resolved}</p>
-              <p className="text-sm text-gray-600">Resolved</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{currentStats.closed}</p>
-              <p className="text-sm text-gray-600">Completed</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-purple-600">{currentStats.monthly}</p>
-              <p className="text-sm text-gray-600">This Month</p>
-            </div>
-          </div>
         </CardContent>
       </Card>
 

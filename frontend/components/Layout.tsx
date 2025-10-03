@@ -49,26 +49,25 @@ export default function Layout({ children }: LayoutProps) {
     const baseNav = [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "engineer"] },
       { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "engineer", "reporter"] },
-      { name: "Assets", href: "/assets", icon: Package, roles: ["admin", "engineer", "reporter"] },
     ];
 
     // Add role-specific navigation items
     if (user.role === "admin" || user.role === "engineer") {
       baseNav.push(
         { name: "Asset Dashboard", href: "/assets/dashboard", icon: LayoutDashboard, roles: ["admin", "engineer"] },
+        { name: "Assets", href: "/assets", icon: Package, roles: ["admin", "engineer"] },
         { name: "Asset Audit", href: "/assets/audit", icon: ScanLine, roles: ["admin", "engineer"] }
+      );
+    } else if (user.role === "reporter") {
+      baseNav.push(
+        { name: "Assets", href: "/assets", icon: Package, roles: ["reporter"] }
       );
     }
 
     if (user.role === "admin") {
       baseNav.push(
-        { name: "New Ticket", href: "/tickets/new", icon: Plus, roles: ["admin"] },
         { name: "Users", href: "/users", icon: Users, roles: ["admin"] },
         { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] }
-      );
-    } else if (user.role === "reporter") {
-      baseNav.push(
-        { name: "New Ticket", href: "/tickets/new", icon: Plus, roles: ["reporter"] }
       );
     }
 

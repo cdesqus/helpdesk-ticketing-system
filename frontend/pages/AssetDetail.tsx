@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { useBackend, useAuth } from "../hooks/useAuth";
-import type { AssetCategory, AssetStatus } from "~backend/asset/types";
+import type { AssetCategory, AssetStatus, AssetTransferHistory } from "~backend/asset/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,9 @@ import {
   Shield,
   Eye,
   Printer,
-  Loader2
+  Loader2,
+  ArrowRightLeft,
+  History
 } from "lucide-react";
 
 export default function AssetDetail() {
@@ -55,7 +57,15 @@ export default function AssetDetail() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [isQRDialogOpen, setIsQRDialogOpen] = useState(false);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [qrCodeData, setQRCodeData] = useState<string>("");
+  const [transferData, setTransferData] = useState({
+    toUser: "",
+    toUserEmail: "",
+    toLocation: "",
+    reason: "",
+    notes: "",
+  });
   const [formData, setFormData] = useState({
     assetId: "",
     hostname: "",
@@ -73,6 +83,15 @@ export default function AssetDetail() {
     comments: "",
     totalLicenses: "",
     usedLicenses: "",
+  });
+
+  const { data: transferHistory } = useQuery({
+    queryKey: ["asset-transfer-history", id],
+    queryFn: async () => {
+      if (!id) return { transfers: [] };
+      return backend.asset.getAssetTransferHistory({ assetId: parseInt(id) });
+    },
+    enabled: !!id && isAuthenticated,
   });
 
   const { data: asset, isLoading, error, refetch, isError } = useQuery({
@@ -154,6 +173,39 @@ export default function AssetDetail() {
       toast({
         title: "Error",
         description: error.message || "Failed to generate QR code.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const transferMutation = useMutation({
+    mutationFn: (data: typeof transferData) => 
+      backend.asset.recordAssetTransfer({ 
+        assetId: parseInt(id!), 
+        ...data 
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset", id] });
+      queryClient.invalidateQueries({ queryKey: ["asset-transfer-history", id] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      setIsTransferDialogOpen(false);
+      setTransferData({
+        toUser: "",
+        toUserEmail: "",
+        toLocation: "",
+        reason: "",
+        notes: "",
+      });
+      toast({
+        title: "Transfer recorded",
+        description: "Asset transfer has been recorded successfully.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Failed to record transfer:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record transfer. Please try again.",
         variant: "destructive",
       });
     },
@@ -263,6 +315,18 @@ export default function AssetDetail() {
 
   const handlePrintLabel = () => {
     navigate(`/assets/${id}/qr-label`);
+  };
+
+  const handleTransfer = () => {
+    if (!transferData.toUser && !transferData.toLocation) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide either a new user or location.",
+        variant: "destructive",
+      });
+      return;
+    }
+    transferMutation.mutate(transferData);
   };
 
   const getCategoryColor = (category: AssetCategory) => {
@@ -422,6 +486,12 @@ export default function AssetDetail() {
                 <Printer className="w-4 h-4 mr-2" />
                 Print Label
               </Button>
+              {(user?.role === "admin" || user?.role === "engineer") && (
+                <Button variant="outline" onClick={() => setIsTransferDialogOpen(true)}>
+                  <ArrowRightLeft className="w-4 h-4 mr-2" />
+                  Transfer
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -741,6 +811,65 @@ export default function AssetDetail() {
         </div>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <History className="w-5 h-5 mr-2" />
+            Transfer History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transferHistory?.transfers && transferHistory.transfers.length > 0 ? (
+            <div className="space-y-4">
+              {transferHistory.transfers.map((transfer: AssetTransferHistory) => (
+                <div key={transfer.id} className="border-l-2 border-blue-500 pl-4 py-2">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {new Date(transfer.transferDate).toLocaleString()}
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div>
+                          <span className="text-sm font-medium">From:</span>
+                          <p className="text-sm text-gray-600">
+                            {transfer.fromUser || "Unassigned"}
+                            {transfer.fromLocation && ` (${transfer.fromLocation})`}
+                          </p>
+                        </div>
+                        <ArrowRightLeft className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <span className="text-sm font-medium">To:</span>
+                          <p className="text-sm text-gray-600">
+                            {transfer.toUser || "Unassigned"}
+                            {transfer.toLocation && ` (${transfer.toLocation})`}
+                          </p>
+                        </div>
+                      </div>
+                      {transfer.reason && (
+                        <p className="text-sm text-gray-500">
+                          <span className="font-medium">Reason:</span> {transfer.reason}
+                        </p>
+                      )}
+                      {transfer.notes && (
+                        <p className="text-sm text-gray-500">
+                          <span className="font-medium">Notes:</span> {transfer.notes}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      By: {transfer.transferredBy}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">No transfer history available.</p>
+          )}
+        </CardContent>
+      </Card>
+
       <Dialog open={isQRDialogOpen} onOpenChange={setIsQRDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -761,6 +890,76 @@ export default function AssetDetail() {
             <Button onClick={handlePrintLabel}>
               <Printer className="w-4 h-4 mr-2" />
               Print Label
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transfer Asset</DialogTitle>
+            <DialogDescription>
+              Record a transfer of this asset to a new user or location.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="toUser">To User</Label>
+              <Input
+                id="toUser"
+                value={transferData.toUser}
+                onChange={(e) => setTransferData({ ...transferData, toUser: e.target.value })}
+                placeholder="New user name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="toUserEmail">To User Email</Label>
+              <Input
+                id="toUserEmail"
+                type="email"
+                value={transferData.toUserEmail}
+                onChange={(e) => setTransferData({ ...transferData, toUserEmail: e.target.value })}
+                placeholder="new.user@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="toLocation">To Location</Label>
+              <Input
+                id="toLocation"
+                value={transferData.toLocation}
+                onChange={(e) => setTransferData({ ...transferData, toLocation: e.target.value })}
+                placeholder="New location"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason</Label>
+              <Input
+                id="reason"
+                value={transferData.reason}
+                onChange={(e) => setTransferData({ ...transferData, reason: e.target.value })}
+                placeholder="Reason for transfer"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={transferData.notes}
+                onChange={(e) => setTransferData({ ...transferData, notes: e.target.value })}
+                placeholder="Additional notes"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTransferDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleTransfer} disabled={transferMutation.isPending}>
+              {transferMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Recording...</>
+              ) : (
+                <><ArrowRightLeft className="w-4 h-4 mr-2" /> Record Transfer</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -34,22 +34,6 @@ export interface AssetAudit {
   notes?: string;
 }
 
-export interface AssetTransferHistory {
-  id: number;
-  assetId: number;
-  fromUser?: string;
-  fromUserEmail?: string;
-  toUser?: string;
-  toUserEmail?: string;
-  fromLocation?: string;
-  toLocation?: string;
-  transferDate: Date;
-  transferredBy: string;
-  reason?: string;
-  notes?: string;
-  createdAt: Date;
-}
-
 export interface AssetStats {
   totalAssets: number;
   assetsByCategory: Array<{

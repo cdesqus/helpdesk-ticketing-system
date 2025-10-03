@@ -1,6 +1,5 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { useBackend } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,6 @@ import {
 
 export default function AssetDashboard() {
   const backend = useBackend();
-  const navigate = useNavigate();
 
   const { data: statsData, isLoading, error, refetch, isError } = useQuery({
     queryKey: ["asset-stats"],

@@ -82,30 +82,29 @@ export const getAssetStats = api<void, GetAssetStatsResponse>(
     const warrantyExpiringSoon = warrantyResult?.count || 0;
 
     // Get audit progress
-    let auditWhereClause = whereClause.replace('WHERE 1=1', '');
     const auditedAssetsQuery = `
-      SELECT COUNT(DISTINCT aa.asset_id) as count 
+      SELECT COUNT(DISTINCT asset_id) as count 
       FROM asset_audits aa
       JOIN assets a ON aa.asset_id = a.id
-      WHERE 1=1 ${auditWhereClause}
+      ${whereClause.replace('WHERE 1=1', 'WHERE 1=1')}
     `;
     const auditedAssetsResult = await assetDB.rawQueryRow<{ count: number }>(auditedAssetsQuery, ...params);
     const auditedAssets = auditedAssetsResult?.count || 0;
 
     const validAssetsQuery = `
-      SELECT COUNT(DISTINCT aa.asset_id) as count 
+      SELECT COUNT(DISTINCT asset_id) as count 
       FROM asset_audits aa
       JOIN assets a ON aa.asset_id = a.id
-      WHERE aa.status = 'valid' ${auditWhereClause}
+      ${whereClause.replace('WHERE 1=1', 'WHERE aa.status = \'valid\' AND 1=1')}
     `;
     const validAssetsResult = await assetDB.rawQueryRow<{ count: number }>(validAssetsQuery, ...params);
     const validAssets = validAssetsResult?.count || 0;
 
     const invalidAssetsQuery = `
-      SELECT COUNT(DISTINCT aa.asset_id) as count 
+      SELECT COUNT(DISTINCT asset_id) as count 
       FROM asset_audits aa
       JOIN assets a ON aa.asset_id = a.id
-      WHERE aa.status = 'invalid' ${auditWhereClause}
+      ${whereClause.replace('WHERE 1=1', 'WHERE aa.status = \'invalid\' AND 1=1')}
     `;
     const invalidAssetsResult = await assetDB.rawQueryRow<{ count: number }>(invalidAssetsQuery, ...params);
     const invalidAssets = invalidAssetsResult?.count || 0;

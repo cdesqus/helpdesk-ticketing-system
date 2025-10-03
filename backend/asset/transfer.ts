@@ -106,8 +106,6 @@ export const recordAssetTransfer = api<RecordTransferRequest, AssetTransferHisto
 export const getAssetTransferHistory = api<GetTransferHistoryRequest, GetTransferHistoryResponse>(
   { auth: true, expose: true, method: "GET", path: "/assets/:assetId/transfer-history" },
   async (req) => {
-    const auth = getAuthData()!;
-
     const asset = await assetDB.queryRow<{ id: number }>`
       SELECT id FROM assets WHERE id = ${req.assetId}
     `;

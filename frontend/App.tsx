@@ -23,7 +23,6 @@ import BulkImportAssets from "./pages/BulkImportAssets";
 import AssetDashboard from "./pages/AssetDashboard";
 import AssetAudit from "./pages/AssetAudit";
 import PrintAssetLabel from "./pages/PrintAssetLabel";
-import StockManagement from "./pages/StockManagement";
 
 const queryClient = new QueryClient();
 
@@ -104,11 +103,6 @@ function AppRoutes() {
         <Route path="/assets/:id/qr-label" element={
           <ProtectedRoute allowedRoles={["admin", "engineer"]}>
             <PrintAssetLabel />
-          </ProtectedRoute>
-        } />
-        <Route path="/assets/:id/stock" element={
-          <ProtectedRoute allowedRoles={["admin", "engineer"]}>
-            <StockManagement />
           </ProtectedRoute>
         } />
         

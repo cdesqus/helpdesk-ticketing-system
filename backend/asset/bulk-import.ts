@@ -126,14 +126,19 @@ export const bulkImportAssets = api<BulkImportAssetsRequest, BulkImportResult>(
             INSERT INTO assets (
               asset_id, hostname, product_name, serial_number, brand_name, model, category,
               location, assigned_user, assigned_user_email, date_acquired, warranty_expiry_date,
-              status, comments, qr_code_data, total_licenses, used_licenses, created_at, updated_at
+              status, comments, qr_code_data, total_licenses, used_licenses, 
+              is_consumable, quantity, min_stock_level, created_at, updated_at
             ) VALUES (
               ${rowData.assetid}, ${rowData.hostname || null}, ${rowData.productname}, ${rowData.serialnumber},
               ${rowData.brandname}, ${rowData.model || null}, ${category}, ${rowData.location || null},
               ${rowData.assigneduser || null}, ${rowData.assigneduseremail || rowData.pic || null}, 
               ${dateAcquired}, ${warrantyExpiryDate}, ${status}, ${rowData.comments || null},
               ${qrCodeData}, ${rowData.totallicenses ? parseInt(rowData.totallicenses) : null}, 
-              ${rowData.usedlicenses ? parseInt(rowData.usedlicenses) : null}, ${now}, ${now}
+              ${rowData.usedlicenses ? parseInt(rowData.usedlicenses) : null},
+              ${category === 'consumable'}, 
+              ${category === 'consumable' && rowData.quantity ? parseInt(rowData.quantity) : null},
+              ${category === 'consumable' && rowData.minstocklevel ? parseInt(rowData.minstocklevel) : null},
+              ${now}, ${now}
             )
             RETURNING *
           `;

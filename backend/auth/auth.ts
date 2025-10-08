@@ -3,7 +3,6 @@ import { Header, Cookie } from "encore.dev/api";
 import { authHandler } from "encore.dev/auth";
 import { authDB } from "./db";
 import type { AuthData, UserRole, UserStatus } from "./types";
-import { getSession } from "./login";
 
 interface AuthParams {
   authorization?: Header<"Authorization">;
@@ -30,17 +29,38 @@ const auth = authHandler<AuthParams, AuthData>(
     try {
       console.log("Auth handler: Checking session for token:", token.substring(0, 8) + "...");
       
-      // Check session storage first - AWAIT the async function
-      const session = await getSession(token);
+      // Check session in database
+      const session = await authDB.queryRow<{
+        token: string;
+        user_id: number;
+        username: string;
+        role: UserRole;
+        created_at: Date;
+        expires_at: Date;
+        last_accessed: Date;
+      }>`SELECT * FROM user_sessions WHERE token = ${token}`;
+
       if (!session) {
-        console.log("Auth handler: Session not found or expired for token:", token.substring(0, 8) + "...");
+        console.log("Auth handler: Session not found for token:", token.substring(0, 8) + "...");
         throw APIError.unauthenticated("invalid or expired session");
       }
+      
+      const now = new Date();
+      
+      // Check if session has expired
+      if (now > session.expires_at) {
+        await authDB.exec`DELETE FROM user_sessions WHERE token = ${token}`;
+        console.log("Auth handler: Session expired:", token.substring(0, 8) + "...");
+        throw APIError.unauthenticated("session expired");
+      }
 
-      console.log("Auth handler: Session found for user:", session.username, "role:", session.role, "expires:", session.expiresAt.toISOString());
+      console.log("Auth handler: Session found for user:", session.username, "role:", session.role, "expires:", session.expires_at.toISOString());
+
+      // Update last accessed time
+      await authDB.exec`UPDATE user_sessions SET last_accessed = ${now} WHERE token = ${token}`;
 
       // Always return the session data for dummy users (don't check database)
-      if (session.userId === 1 && session.username === "admin") {
+      if (session.user_id === 1 && session.username === "admin") {
         console.log("Auth handler: Returning dummy admin user");
         return {
           userID: "1",
@@ -51,7 +71,7 @@ const auth = authHandler<AuthParams, AuthData>(
         };
       }
 
-      if (session.userId === 2 && session.username === "haryanto") {
+      if (session.user_id === 2 && session.username === "haryanto") {
         console.log("Auth handler: Returning dummy haryanto user");
         return {
           userID: "2",
@@ -64,7 +84,7 @@ const auth = authHandler<AuthParams, AuthData>(
 
       // For other users, try database lookup but don't fail if database is unavailable
       try {
-        console.log("Auth handler: Looking up user in database for session user ID:", session.userId);
+        console.log("Auth handler: Looking up user in database for session user ID:", session.user_id);
         const user = await authDB.queryRow<{
           id: number;
           username: string;
@@ -72,13 +92,13 @@ const auth = authHandler<AuthParams, AuthData>(
           full_name: string;
           role: UserRole;
           status: UserStatus;
-        }>`SELECT id, username, email, full_name, role, status FROM users WHERE id = ${session.userId}`;
+        }>`SELECT id, username, email, full_name, role, status FROM users WHERE id = ${session.user_id}`;
 
         if (!user) {
-          console.log("Auth handler: User not found in database for session user ID:", session.userId);
+          console.log("Auth handler: User not found in database for session user ID:", session.user_id);
           // Don't fail, use session data
           return {
-            userID: session.userId.toString(),
+            userID: session.user_id.toString(),
             username: session.username,
             email: `${session.username}@idesolusi.co.id`,
             fullName: session.username,
@@ -106,7 +126,7 @@ const auth = authHandler<AuthParams, AuthData>(
         // If database fails, use session data as fallback
         console.log("Auth handler: Database failed, using session data as fallback");
         return {
-          userID: session.userId.toString(),
+          userID: session.user_id.toString(),
           username: session.username,
           email: `${session.username}@idesolusi.co.id`,
           fullName: session.username,

@@ -62,13 +62,8 @@ export default function Layout({ children }: LayoutProps) {
 
     if (user.role === "admin") {
       baseNav.push(
-        { name: "New Ticket", href: "/tickets/new", icon: Plus, roles: ["admin"] },
         { name: "Users", href: "/users", icon: Users, roles: ["admin"] },
         { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] }
-      );
-    } else if (user.role === "reporter") {
-      baseNav.push(
-        { name: "New Ticket", href: "/tickets/new", icon: Plus, roles: ["reporter"] }
       );
     }
 

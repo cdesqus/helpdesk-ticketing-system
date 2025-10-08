@@ -104,6 +104,16 @@ export const getAssetStats = api<void, GetAssetStatsResponse>(
         // Keep defaults as 0
       }
 
+      const lowStockResult = await assetDB.queryRow<{ count: number }>`
+        SELECT COUNT(*) as count 
+        FROM assets
+        WHERE is_consumable = TRUE 
+        AND quantity <= min_stock_level
+        AND status != 'retired'
+      `;
+      const lowStockItems = Number(lowStockResult?.count) || 0;
+      console.log(`[AssetStats] Low stock items: ${lowStockItems}`);
+
       const stats: AssetStats = {
         totalAssets,
         assetsByCategory: categoryRows.map(row => ({
@@ -125,6 +135,7 @@ export const getAssetStats = api<void, GetAssetStatsResponse>(
           validAssets,
           invalidAssets,
         },
+        lowStockItems,
       };
 
       console.log(`[AssetStats] Successfully calculated all stats`);
@@ -146,6 +157,7 @@ export const getAssetStats = api<void, GetAssetStatsResponse>(
             validAssets: 0,
             invalidAssets: 0,
           },
+          lowStockItems: 0,
         },
       };
     }

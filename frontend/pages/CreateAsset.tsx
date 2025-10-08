@@ -41,6 +41,9 @@ export default function CreateAsset() {
     comments: "",
     totalLicenses: "",
     usedLicenses: "",
+    isConsumable: false,
+    quantity: "",
+    minStockLevel: "",
   });
 
   const createMutation = useMutation({
@@ -76,12 +79,17 @@ export default function CreateAsset() {
       return;
     }
 
+    const isConsumable = formData.isConsumable || formData.category === 'consumable';
+    
     const submitData = {
       ...formData,
       dateAcquired: formData.dateAcquired ? new Date(formData.dateAcquired) : undefined,
       warrantyExpiryDate: formData.warrantyExpiryDate ? new Date(formData.warrantyExpiryDate) : undefined,
       totalLicenses: formData.category === 'license' ? parseInt(formData.totalLicenses) || 0 : undefined,
       usedLicenses: formData.category === 'license' ? parseInt(formData.usedLicenses) || 0 : undefined,
+      isConsumable,
+      quantity: isConsumable ? parseInt(formData.quantity) || 0 : undefined,
+      minStockLevel: isConsumable ? parseInt(formData.minStockLevel) || 0 : undefined,
     };
 
     createMutation.mutate(submitData);
@@ -194,6 +202,19 @@ export default function CreateAsset() {
                 <div className="space-y-2">
                   <Label htmlFor="usedLicenses">Used Licenses</Label>
                   <Input id="usedLicenses" type="number" value={formData.usedLicenses} onChange={(e) => setFormData({ ...formData, usedLicenses: e.target.value })} />
+                </div>
+              </div>
+            )}
+
+            {(formData.isConsumable || formData.category === 'consumable') && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Initial Quantity</Label>
+                  <Input id="quantity" type="number" min="0" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="minStockLevel">Minimum Stock Level (Alert Threshold)</Label>
+                  <Input id="minStockLevel" type="number" min="0" value={formData.minStockLevel} onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })} />
                 </div>
               </div>
             )}

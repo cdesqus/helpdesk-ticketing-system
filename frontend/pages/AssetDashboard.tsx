@@ -81,11 +81,12 @@ export default function AssetDashboard() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card><CardContent className="p-6"><div className="flex items-center"><Package className="h-8 w-8 text-blue-600" /><div className="ml-4"><p className="text-sm font-medium text-gray-500">Total Assets</p><p className="text-2xl font-semibold text-gray-900">{stats?.totalAssets}</p></div></div></CardContent></Card>
         <Card><CardContent className="p-6"><div className="flex items-center"><PackageCheck className="h-8 w-8 text-green-600" /><div className="ml-4"><p className="text-sm font-medium text-gray-500">Assets In Use</p><p className="text-2xl font-semibold text-gray-900">{stats?.assetsByStatus.find(s => s.status === 'in_use')?.count || 0}</p></div></div></CardContent></Card>
         <Card><CardContent className="p-6"><div className="flex items-center"><PackageX className="h-8 w-8 text-red-600" /><div className="ml-4"><p className="text-sm font-medium text-gray-500">Out of Order</p><p className="text-2xl font-semibold text-gray-900">{stats?.assetsByStatus.find(s => s.status === 'out_of_order')?.count || 0}</p></div></div></CardContent></Card>
         <Card><CardContent className="p-6"><div className="flex items-center"><Shield className="h-8 w-8 text-yellow-600" /><div className="ml-4"><p className="text-sm font-medium text-gray-500">Warranty Expiring Soon</p><p className="text-2xl font-semibold text-gray-900">{stats?.warrantyExpiringSoon}</p></div></div></CardContent></Card>
+        <Card className={stats?.lowStockItems && stats.lowStockItems > 0 ? "border-orange-200" : ""}><CardContent className="p-6"><div className="flex items-center"><AlertCircle className={`h-8 w-8 ${stats?.lowStockItems && stats.lowStockItems > 0 ? 'text-orange-600' : 'text-gray-400'}`} /><div className="ml-4"><p className="text-sm font-medium text-gray-500">Low Stock Items</p><p className="text-2xl font-semibold text-gray-900">{stats?.lowStockItems || 0}</p></div></div></CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

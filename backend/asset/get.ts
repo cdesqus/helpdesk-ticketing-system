@@ -32,6 +32,9 @@ export const getAsset = api<GetAssetRequest, Asset>(
       qr_code_data: string | null;
       total_licenses: number | null;
       used_licenses: number | null;
+      is_consumable: boolean;
+      quantity: number | null;
+      min_stock_level: number | null;
       created_at: Date;
       updated_at: Date;
     }>`SELECT * FROM assets WHERE id = ${req.id}`;
@@ -68,6 +71,9 @@ export const getAsset = api<GetAssetRequest, Asset>(
       qrCodeData: row.qr_code_data || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      isConsumable: row.is_consumable,
+      quantity: row.quantity || undefined,
+      minStockLevel: row.min_stock_level || undefined,
       ...(row.category === 'license' && {
         totalLicenses: row.total_licenses || undefined,
         usedLicenses: row.used_licenses || undefined,

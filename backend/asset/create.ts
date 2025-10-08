@@ -20,6 +20,9 @@ export interface CreateAssetRequest {
   comments?: string;
   totalLicenses?: number;
   usedLicenses?: number;
+  isConsumable?: boolean;
+  quantity?: number;
+  minStockLevel?: number;
 }
 
 // Creates a new asset.
@@ -52,6 +55,8 @@ export const createAsset = api<CreateAssetRequest, Asset>(
 
     const now = new Date();
 
+    const isConsumable = req.isConsumable ?? (req.category === 'consumable');
+
     const row = await assetDB.queryRow<{
       id: number;
       asset_id: string;
@@ -71,19 +76,24 @@ export const createAsset = api<CreateAssetRequest, Asset>(
       qr_code_data: string | null;
       total_licenses: number | null;
       used_licenses: number | null;
+      is_consumable: boolean;
+      quantity: number | null;
+      min_stock_level: number | null;
       created_at: Date;
       updated_at: Date;
     }>`
       INSERT INTO assets (
         asset_id, hostname, product_name, serial_number, brand_name, model, category,
         location, assigned_user, assigned_user_email, date_acquired, warranty_expiry_date,
-        status, comments, qr_code_data, total_licenses, used_licenses, created_at, updated_at
+        status, comments, qr_code_data, total_licenses, used_licenses, 
+        is_consumable, quantity, min_stock_level, created_at, updated_at
       ) VALUES (
         ${req.assetId}, ${req.hostname || null}, ${req.productName}, ${req.serialNumber},
         ${req.brandName}, ${req.model || null}, ${req.category}, ${req.location || null},
         ${req.assignedUser || null}, ${req.assignedUserEmail || null}, ${req.dateAcquired || null},
         ${req.warrantyExpiryDate || null}, ${req.status || "available"}, ${req.comments || null},
-        ${qrCodeData}, ${req.totalLicenses || null}, ${req.usedLicenses || null}, ${now}, ${now}
+        ${qrCodeData}, ${req.totalLicenses || null}, ${req.usedLicenses || null},
+        ${isConsumable}, ${req.quantity || null}, ${req.minStockLevel || null}, ${now}, ${now}
       )
       RETURNING *
     `;
@@ -92,7 +102,7 @@ export const createAsset = api<CreateAssetRequest, Asset>(
       throw new Error("Failed to create asset");
     }
 
-    return {
+    const asset: Asset = {
       id: row.id,
       assetId: row.asset_id,
       hostname: row.hostname || undefined,
@@ -111,10 +121,28 @@ export const createAsset = api<CreateAssetRequest, Asset>(
       qrCodeData: row.qr_code_data || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      isConsumable: row.is_consumable,
+      quantity: row.quantity || undefined,
+      minStockLevel: row.min_stock_level || undefined,
       ...(row.category === 'license' && {
         totalLicenses: row.total_licenses || undefined,
         usedLicenses: row.used_licenses || undefined,
       }),
     };
+
+    if (isConsumable && req.quantity) {
+      await assetDB.exec`
+        INSERT INTO stock_transactions (
+          asset_id, transaction_type, quantity_change, 
+          quantity_before, quantity_after, performed_by, reason
+        )
+        VALUES (
+          ${row.id}, 'initial', ${req.quantity},
+          0, ${req.quantity}, ${auth.userID}, 'Initial stock'
+        )
+      `;
+    }
+
+    return asset;
   }
 );

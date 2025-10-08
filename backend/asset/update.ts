@@ -21,6 +21,9 @@ export interface UpdateAssetRequest {
   comments?: string;
   totalLicenses?: number;
   usedLicenses?: number;
+  isConsumable?: boolean;
+  quantity?: number;
+  minStockLevel?: number;
 }
 
 // Updates an existing asset.
@@ -164,6 +167,24 @@ export const updateAsset = api<UpdateAssetRequest, Asset>(
       paramIndex++;
     }
 
+    if (req.isConsumable !== undefined) {
+      updates.push(`is_consumable = $${paramIndex}`);
+      params.push(req.isConsumable);
+      paramIndex++;
+    }
+
+    if (req.quantity !== undefined) {
+      updates.push(`quantity = $${paramIndex}`);
+      params.push(req.quantity || null);
+      paramIndex++;
+    }
+
+    if (req.minStockLevel !== undefined) {
+      updates.push(`min_stock_level = $${paramIndex}`);
+      params.push(req.minStockLevel || null);
+      paramIndex++;
+    }
+
     // Update QR code data if relevant fields changed
     if (req.hostname !== undefined || req.serialNumber !== undefined || req.dateAcquired !== undefined) {
       const hostname = req.hostname !== undefined ? req.hostname : existingAsset.hostname;
@@ -212,6 +233,9 @@ export const updateAsset = api<UpdateAssetRequest, Asset>(
       qr_code_data: string | null;
       total_licenses: number | null;
       used_licenses: number | null;
+      is_consumable: boolean;
+      quantity: number | null;
+      min_stock_level: number | null;
       created_at: Date;
       updated_at: Date;
     }>(query, ...params);
@@ -239,6 +263,9 @@ export const updateAsset = api<UpdateAssetRequest, Asset>(
       qrCodeData: row.qr_code_data || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      isConsumable: row.is_consumable,
+      quantity: row.quantity || undefined,
+      minStockLevel: row.min_stock_level || undefined,
       ...(row.category === 'license' && {
         totalLicenses: row.total_licenses || undefined,
         usedLicenses: row.used_licenses || undefined,

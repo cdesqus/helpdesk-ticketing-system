@@ -22,6 +22,9 @@ export interface Asset {
   updatedAt: Date;
   totalLicenses?: number;
   usedLicenses?: number;
+  isConsumable: boolean;
+  quantity?: number;
+  minStockLevel?: number;
 }
 
 export interface AssetAudit {
@@ -32,6 +35,21 @@ export interface AssetAudit {
   status: "valid" | "invalid" | "not_found";
   scannedData?: string;
   notes?: string;
+}
+
+export type StockTransactionType = "add" | "remove" | "adjustment" | "initial";
+
+export interface StockTransaction {
+  id: number;
+  assetId: number;
+  transactionType: StockTransactionType;
+  quantityChange: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  performedBy: string;
+  reason?: string;
+  referenceNumber?: string;
+  createdAt: Date;
 }
 
 export interface AssetStats {
@@ -55,4 +73,5 @@ export interface AssetStats {
     validAssets: number;
     invalidAssets: number;
   };
+  lowStockItems: number;
 }

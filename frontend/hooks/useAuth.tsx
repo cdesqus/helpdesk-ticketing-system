@@ -35,7 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Verify the token is still valid by fetching current user
       const authenticatedBackend = backend.with({
         auth: () => Promise.resolve({ authorization: `Bearer ${storedToken}` })
       });
@@ -43,10 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = await authenticatedBackend.auth.getCurrentUser();
       setUser(currentUser);
       setToken(storedToken);
-      console.log("Auth refreshed successfully for user:", currentUser.username);
     } catch (error) {
       console.error("Auth refresh failed:", error);
-      // Clear invalid session
       localStorage.removeItem("auth_token");
       localStorage.removeItem("auth_user");
       setUser(null);
@@ -56,43 +53,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Auto-refresh session every 30 minutes
   useEffect(() => {
     if (token) {
       const refreshInterval = setInterval(async () => {
         try {
-          console.log("Auto-refreshing session...");
           const authenticatedBackend = backend.with({
             auth: () => Promise.resolve({ authorization: `Bearer ${token}` })
           });
           
           await authenticatedBackend.auth.refreshSession();
-          console.log("Session auto-refreshed successfully");
         } catch (error) {
           console.error("Auto-refresh failed:", error);
           logout();
         }
-      }, 30 * 60 * 1000); // 30 minutes
+      }, 30 * 60 * 1000);
 
       return () => clearInterval(refreshInterval);
     }
   }, [token]);
 
   useEffect(() => {
-    // Check for existing session on app load
     const storedToken = localStorage.getItem("auth_token");
     const storedUser = localStorage.getItem("auth_user");
-    
-    console.log("Checking stored auth data:", { hasToken: !!storedToken, hasUser: !!storedUser });
     
     if (storedToken && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setToken(storedToken);
         setUser(parsedUser);
-        console.log("Restored session for user:", parsedUser.username);
         
-        // Verify session is still valid in the background
         setTimeout(() => {
           refreshAuth();
         }, 1000);
@@ -109,21 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     try {
-      console.log("Attempting login for user:", username);
       const response = await backend.auth.login({ username, password });
-      
-      console.log("Login response received:", { 
-        user: response.user.username, 
-        hasToken: !!response.token 
-      });
       
       setUser(response.user);
       setToken(response.token);
       
       localStorage.setItem("auth_token", response.token);
       localStorage.setItem("auth_user", JSON.stringify(response.user));
-      
-      console.log("Login successful for user:", response.user.username);
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
@@ -133,8 +114,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       if (token) {
-        console.log("Logging out user...");
-        // Call logout endpoint to invalidate session on server
         const authenticatedBackend = backend.with({
           auth: () => Promise.resolve({ authorization: `Bearer ${token}` })
         });
@@ -143,8 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      // Clear local state regardless of server response
-      console.log("Clearing local session data");
       setUser(null);
       setToken(null);
       localStorage.removeItem("auth_token");
@@ -162,15 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshAuth,
   };
 
-  console.log("Auth context value:", { 
-    hasUser: !!user, 
-    hasToken: !!token, 
-    isLoading, 
-    isAuthenticated: value.isAuthenticated,
-    username: user?.username,
-    role: user?.role
-  });
-
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -180,25 +148,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // Returns the authenticated backend client with automatic retry on 401
 export function useBackend() {
-  const { token, user, logout } = useAuth();
-  
-  console.log("useBackend called:", { hasToken: !!token, username: user?.username });
+  const { token } = useAuth();
   
   if (!token) {
-    console.log("No token available, returning unauthenticated backend client");
     return backend;
   }
   
-  const authenticatedBackendClient = backend.with({
-    auth: () => {
-      console.log("Using auth token for request:", token.substring(0, 8) + "...");
-      return Promise.resolve({ authorization: `Bearer ${token}` });
-    }
+  return backend.with({
+    auth: () => Promise.resolve({ authorization: `Bearer ${token}` })
   });
-
-  // Return the authenticated backend client directly
-  const backendProxy = authenticatedBackendClient;
-  
-  console.log("Returning authenticated backend client with auto-logout on 401");
-  return backendProxy;
 }

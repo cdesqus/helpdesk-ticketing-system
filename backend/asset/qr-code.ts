@@ -14,7 +14,7 @@ export interface GenerateQRCodeResponse {
 
 export interface GenerateQRLabelRequest {
   id: number;
-  labelSize?: "60x30" | "4x6" | "a4";
+  labelSize?: "4x6" | "a4";
 }
 
 export interface GenerateQRLabelResponse {
@@ -22,13 +22,11 @@ export interface GenerateQRLabelResponse {
   qrCodeDataUrl: string;
 }
 
-// Generates QR code for an asset.
 export const generateQRCode = api<GenerateQRCodeRequest, GenerateQRCodeResponse>(
   { auth: true, expose: true, method: "POST", path: "/assets/:id/qr-code" },
   async (req) => {
     const auth = getAuthData()!;
     
-    // Only admins and engineers can generate QR codes
     if (auth.role === "reporter") {
       throw APIError.permissionDenied("reporters cannot generate QR codes");
     }
@@ -48,7 +46,6 @@ export const generateQRCode = api<GenerateQRCodeRequest, GenerateQRCodeResponse>
 
     let qrCodeData = asset.qr_code_data;
     
-    // Generate QR code data if not exists
     if (!qrCodeData) {
       const currentYear = new Date().getFullYear();
       qrCodeData = JSON.stringify({
@@ -58,7 +55,6 @@ export const generateQRCode = api<GenerateQRCodeRequest, GenerateQRCodeResponse>
         year: asset.date_acquired ? new Date(asset.date_acquired).getFullYear() : currentYear,
       });
 
-      // Update asset with QR code data
       await assetDB.exec`
         UPDATE assets 
         SET qr_code_data = ${qrCodeData}, updated_at = NOW()
@@ -66,7 +62,6 @@ export const generateQRCode = api<GenerateQRCodeRequest, GenerateQRCodeResponse>
       `;
     }
 
-    // Generate QR code image
     const qrCodeDataUrl = await QRCode.toDataURL(qrCodeData, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
@@ -85,13 +80,11 @@ export const generateQRCode = api<GenerateQRCodeRequest, GenerateQRCodeResponse>
   }
 );
 
-// Generates printable QR code label for an asset
 export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelResponse>(
   { auth: true, expose: true, method: "POST", path: "/assets/:id/qr-label" },
   async (req) => {
     const auth = getAuthData()!;
     
-    // Only admins and engineers can generate QR labels
     if (auth.role === "reporter") {
       throw APIError.permissionDenied("reporters cannot generate QR labels");
     }
@@ -117,7 +110,6 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
 
     let qrCodeData = asset.qr_code_data;
     
-    // Generate QR code data if not exists
     if (!qrCodeData) {
       const currentYear = new Date().getFullYear();
       qrCodeData = JSON.stringify({
@@ -127,7 +119,6 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
         year: asset.date_acquired ? new Date(asset.date_acquired).getFullYear() : currentYear,
       });
 
-      // Update asset with QR code data
       await assetDB.exec`
         UPDATE assets 
         SET qr_code_data = ${qrCodeData}, updated_at = NOW()
@@ -135,12 +126,6 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
       `;
     }
 
-    const labelSize = req.labelSize || "60x30";
-    const is60x30 = labelSize === "60x30";
-    const isA4 = labelSize === "a4";
-
-    // Generate QR code image with appropriate size for label
-    const qrSize = is60x30 ? 80 : (isA4 ? 200 : 200);
     const qrCodeDataUrl = await QRCode.toDataURL(qrCodeData, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
@@ -149,10 +134,12 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
         dark: '#000000',
         light: '#FFFFFF'
       },
-      width: qrSize
+      width: 200
     });
 
-    // Generate HTML label
+    const labelSize = req.labelSize || "4x6";
+    const isA4 = labelSize === "a4";
+
     const labelHtml = `
 <!DOCTYPE html>
 <html>
@@ -168,7 +155,7 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
         body {
             font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: ${is60x30 ? '2mm' : (isA4 ? '20mm' : '5mm')};
+            padding: ${isA4 ? '20mm' : '5mm'};
             background: #f0f2f5;
         }
         .label-container {
@@ -177,19 +164,19 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
             align-items: center;
         }
         .label {
-            width: ${is60x30 ? '60mm' : (isA4 ? '180mm' : '95mm')};
-            height: ${is60x30 ? '30mm' : (isA4 ? '120mm' : '60mm')};
+            width: ${isA4 ? '180mm' : '95mm'};
+            height: ${isA4 ? '120mm' : '60mm'};
             border: 1px solid #ccc;
-            border-radius: ${is60x30 ? '2px' : '8px'};
-            padding: ${is60x30 ? '2mm' : (isA4 ? '8mm' : '4mm')};
+            border-radius: 8px;
+            padding: ${isA4 ? '8mm' : '4mm'};
             box-sizing: border-box;
             display: flex;
-            flex-direction: ${is60x30 ? 'row' : 'column'};
+            flex-direction: column;
             background: white;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .header {
-            display: ${is60x30 ? 'none' : 'flex'};
+            display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid #3b82f6;
@@ -211,14 +198,13 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
             justify-content: space-between;
             align-items: center;
             flex: 1;
-            gap: ${is60x30 ? '2mm' : '0'};
         }
         .asset-info {
-            flex: ${is60x30 ? '1' : '2'};
-            padding-right: ${is60x30 ? '0' : (isA4 ? '8mm' : '4mm')};
+            flex: 2;
+            padding-right: ${isA4 ? '8mm' : '4mm'};
         }
         .qr-code {
-            flex: ${is60x30 ? '0 0 auto' : '1'};
+            flex: 1;
             text-align: center;
             display: flex;
             flex-direction: column;
@@ -226,43 +212,33 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
             justify-content: center;
         }
         .qr-code img {
-            width: ${is60x30 ? '24mm' : (isA4 ? '100px' : '70px')};
-            height: ${is60x30 ? '24mm' : (isA4 ? '100px' : '70px')};
-            border: ${is60x30 ? '1px' : '2px'} solid #eee;
-            padding: ${is60x30 ? '1px' : '4px'};
-            border-radius: 2px;
+            width: ${isA4 ? '100px' : '70px'};
+            height: ${isA4 ? '100px' : '70px'};
+            border: 2px solid #eee;
+            padding: 4px;
+            border-radius: 4px;
         }
         .qr-code-text {
-            font-size: ${is60x30 ? '5px' : (isA4 ? '10px' : '8px')};
+            font-size: ${isA4 ? '10px' : '8px'};
             color: #555;
-            margin-top: ${is60x30 ? '1px' : '4px'};
-            display: ${is60x30 ? 'none' : 'block'};
+            margin-top: 4px;
         }
         .info-grid {
             display: grid;
-            grid-template-columns: ${is60x30 ? '1fr' : 'auto 1fr'};
-            gap: ${is60x30 ? '0.5mm' : (isA4 ? '4mm 8mm' : '2mm 4mm')};
-            font-size: ${is60x30 ? '7px' : (isA4 ? '12px' : '10px')};
-            line-height: ${is60x30 ? '1.1' : '1.4'};
+            grid-template-columns: auto 1fr;
+            gap: ${isA4 ? '4mm 8mm' : '2mm 4mm'};
+            font-size: ${isA4 ? '12px' : '10px'};
         }
         .info-label {
-            font-weight: ${is60x30 ? '700' : '600'};
+            font-weight: 600;
             color: #374151;
-            text-align: ${is60x30 ? 'left' : 'right'};
-            display: ${is60x30 ? 'inline' : 'block'};
+            text-align: right;
         }
         .info-value {
             color: #4b5563;
-            font-family: ${is60x30 ? 'Arial, sans-serif' : "'Consolas', 'Monaco', monospace"};
-            display: ${is60x30 ? 'inline' : 'block'};
-        }
-        .info-row {
-            white-space: ${is60x30 ? 'nowrap' : 'normal'};
-            overflow: ${is60x30 ? 'hidden' : 'visible'};
-            text-overflow: ${is60x30 ? 'ellipsis' : 'clip'};
+            font-family: 'Consolas', 'Monaco', monospace;
         }
         .footer {
-            display: ${is60x30 ? 'none' : 'block'};
             text-align: center;
             font-size: ${isA4 ? '10px' : '8px'};
             color: #9ca3af;
@@ -297,19 +273,6 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
                 <div class="asset-title">IT Asset Tag</div>
             </div>
             <div class="content">
-                ${is60x30 ? `
-                <div class="qr-code">
-                    <img src="${qrCodeDataUrl}" alt="QR Code" />
-                </div>
-                <div class="asset-info">
-                    <div class="info-grid">
-                        <div class="info-row"><span class="info-label">ID:</span> <span class="info-value">${asset.asset_id}</span></div>
-                        <div class="info-row"><span class="info-label">Host:</span> <span class="info-value">${asset.hostname || asset.asset_id}</span></div>
-                        <div class="info-row"><span class="info-label">SN:</span> <span class="info-value">${asset.serial_number}</span></div>
-                        <div class="info-row"><span class="info-label">Brand:</span> <span class="info-value">${asset.brand_name}</span></div>
-                    </div>
-                </div>
-                ` : `
                 <div class="asset-info">
                     <div class="info-grid">
                         <span class="info-label">Asset ID:</span>
@@ -332,7 +295,6 @@ export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelRespon
                     <img src="${qrCodeDataUrl}" alt="QR Code" />
                     <div class="qr-code-text">Scan for details</div>
                 </div>
-                `}
             </div>
             <div class="footer">
                 Acquired: ${asset.date_acquired ? new Date(asset.date_acquired).toLocaleDateString() : 'N/A'} | Property of IDESOLUSI

@@ -57,38 +57,35 @@ export default function QRScanner({ onScan, onError, isScanning, onStartScan, on
         </Alert>
       )}
       
-      <div className="relative w-full bg-black rounded-lg overflow-hidden">
+      <div className="relative w-full rounded-lg overflow-hidden" style={{ backgroundColor: '#000' }}>
         <QrReader
           onResult={handleScan}
           constraints={{
-            facingMode: "environment",
-            aspectRatio: 1
+            facingMode: "environment"
           }}
-          containerStyle={{
-            width: "100%",
-            paddingTop: "100%",
-            position: "relative"
+          videoContainerStyle={{
+            paddingTop: '100%'
           }}
           videoStyle={{
-            position: "absolute",
+            position: 'absolute',
             top: 0,
             left: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover"
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
           }}
         />
         
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-64 h-64 border-2 border-white rounded-lg">
-            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
-            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
-            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
-            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+          <div className="relative w-64 h-64 border-2 border-white/50 rounded-lg">
+            <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-blue-500"></div>
+            <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-blue-500"></div>
+            <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-blue-500"></div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-blue-500"></div>
           </div>
         </div>
 
-        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10 pointer-events-auto">
           <Button variant="destructive" size="sm" onClick={onStopScan}>
             <CameraOff className="w-4 h-4 mr-2" />
             Stop Camera
@@ -98,6 +95,7 @@ export default function QRScanner({ onScan, onError, isScanning, onStartScan, on
 
       <div className="text-center text-sm text-gray-600">
         <p>Position the QR code within the frame to scan</p>
+        <p className="text-xs text-gray-500 mt-1">Make sure to allow camera access when prompted</p>
       </div>
     </div>
   );

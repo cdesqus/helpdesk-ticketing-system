@@ -146,6 +146,7 @@ export default function AssetDetail() {
   const qrCodeMutation = useMutation({
     mutationFn: () => backend.asset.generateQRCode({ id: parseInt(id!) }),
     onSuccess: (data) => {
+      console.log("QR Code generated:", data);
       setQRCodeData(data.qrCodeDataUrl);
       setIsQRDialogOpen(true);
     },
@@ -748,18 +749,33 @@ export default function AssetDetail() {
       </div>
 
       <Dialog open={isQRDialogOpen} onOpenChange={setIsQRDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Asset QR Code</DialogTitle>
             <DialogDescription>
               Scan this QR code to view asset details or perform an audit.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-center p-4">
+          <div className="flex justify-center p-4 bg-white">
             {qrCodeMutation.isPending ? (
-              <Loader2 className="w-16 h-16 animate-spin" />
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="w-16 h-16 animate-spin text-blue-500" />
+                <p className="text-sm text-gray-500">Generating QR code...</p>
+              </div>
+            ) : qrCodeData ? (
+              <div className="space-y-4">
+                <img 
+                  src={qrCodeData} 
+                  alt="Asset QR Code" 
+                  className="w-64 h-64 border-2 border-gray-200 rounded-lg"
+                />
+                <p className="text-xs text-center text-gray-500">Asset: {asset?.assetId}</p>
+              </div>
             ) : (
-              <img src={qrCodeData} alt="Asset QR Code" className="w-64 h-64" />
+              <div className="text-center py-8 text-gray-500">
+                <AlertCircle className="w-12 h-12 mx-auto mb-2" />
+                <p>No QR code available</p>
+              </div>
             )}
           </div>
           <DialogFooter>

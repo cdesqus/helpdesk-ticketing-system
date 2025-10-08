@@ -119,6 +119,11 @@ import {
     generateQRLabel as api_asset_qr_code_generateQRLabel
 } from "~backend/asset/qr-code";
 import { getAssetStats as api_asset_stats_getAssetStats } from "~backend/asset/stats";
+import {
+    adjustStock as api_asset_stock_adjustStock,
+    getLowStockItems as api_asset_stock_getLowStockItems,
+    getStockTransactions as api_asset_stock_getStockTransactions
+} from "~backend/asset/stock";
 import { updateAsset as api_asset_update_updateAsset } from "~backend/asset/update";
 
 export namespace asset {
@@ -128,6 +133,7 @@ export namespace asset {
 
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
+            this.adjustStock = this.adjustStock.bind(this)
             this.bulkImportAssets = this.bulkImportAssets.bind(this)
             this.createAsset = this.createAsset.bind(this)
             this.deleteAsset = this.deleteAsset.bind(this)
@@ -138,10 +144,26 @@ export namespace asset {
             this.generateQRLabel = this.generateQRLabel.bind(this)
             this.getAsset = this.getAsset.bind(this)
             this.getAssetStats = this.getAssetStats.bind(this)
+            this.getLowStockItems = this.getLowStockItems.bind(this)
+            this.getStockTransactions = this.getStockTransactions.bind(this)
             this.listAssets = this.listAssets.bind(this)
             this.listAudits = this.listAudits.bind(this)
             this.scanAsset = this.scanAsset.bind(this)
             this.updateAsset = this.updateAsset.bind(this)
+        }
+
+        public async adjustStock(params: RequestType<typeof api_asset_stock_adjustStock>): Promise<ResponseType<typeof api_asset_stock_adjustStock>> {
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                quantity:        params.quantity,
+                reason:          params.reason,
+                referenceNumber: params.referenceNumber,
+                transactionType: params.transactionType,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/assets/${encodeURIComponent(params.assetId)}/stock/adjust`, {method: "POST", body: JSON.stringify(body)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_stock_adjustStock>
         }
 
         /**
@@ -253,6 +275,18 @@ export namespace asset {
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_stats_getAssetStats>
         }
 
+        public async getLowStockItems(): Promise<ResponseType<typeof api_asset_stock_getLowStockItems>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/assets/stock/low`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_stock_getLowStockItems>
+        }
+
+        public async getStockTransactions(params: { assetId: number }): Promise<ResponseType<typeof api_asset_stock_getStockTransactions>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/assets/${encodeURIComponent(params.assetId)}/stock/transactions`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_stock_getStockTransactions>
+        }
+
         /**
          * Retrieves assets with filtering and pagination.
          */
@@ -313,9 +347,12 @@ export namespace asset {
                 comments:           params.comments,
                 dateAcquired:       params.dateAcquired,
                 hostname:           params.hostname,
+                isConsumable:       params.isConsumable,
                 location:           params.location,
+                minStockLevel:      params.minStockLevel,
                 model:              params.model,
                 productName:        params.productName,
+                quantity:           params.quantity,
                 serialNumber:       params.serialNumber,
                 status:             params.status,
                 totalLicenses:      params.totalLicenses,

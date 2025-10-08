@@ -11,8 +11,6 @@ interface AuthParams {
 
 const auth = authHandler<AuthParams, AuthData>(
   async (data) => {
-
-    // Extract token from authorization header or session cookie
     const token = data.authorization?.replace("Bearer ", "") ?? data.session?.value;
     
     if (!token) {
@@ -20,8 +18,6 @@ const auth = authHandler<AuthParams, AuthData>(
     }
 
     try {
-      
-      // Check session in database
       const session = await authDB.queryRow<{
         token: string;
         user_id: number;

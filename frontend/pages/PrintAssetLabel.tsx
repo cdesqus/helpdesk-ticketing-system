@@ -23,8 +23,12 @@ export default function PrintAssetLabel() {
   useEffect(() => {
     if (id) {
       setIsLoading(true);
+      setError(null);
+      console.log("Generating QR label for asset:", id, "with size:", labelSize);
+      
       backend.asset.generateQRLabel({ id: parseInt(id), labelSize })
         .then(response => {
+          console.log("QR label generated successfully");
           setLabelHtml(response.labelHtml);
         })
         .catch(err => {

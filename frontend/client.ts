@@ -234,18 +234,12 @@ export namespace asset {
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_bulk_import_generateImportTemplate>
         }
 
-        /**
-         * Generates QR code for an asset.
-         */
         public async generateQRCode(params: { id: number }): Promise<ResponseType<typeof api_asset_qr_code_generateQRCode>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/assets/${encodeURIComponent(params.id)}/qr-code`, {method: "POST", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_qr_code_generateQRCode>
         }
 
-        /**
-         * Generates printable QR code label for an asset.
-         */
         public async generateQRLabel(params: RequestType<typeof api_asset_qr_code_generateQRLabel>): Promise<ResponseType<typeof api_asset_qr_code_generateQRLabel>> {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {

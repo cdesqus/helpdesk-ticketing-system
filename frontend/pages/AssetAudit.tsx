@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBackend } from "../hooks/useAuth";
-import { QrReader } from "react-qr-reader";
+import QRScanner from "../components/QRScanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,9 +24,7 @@ import {
   HelpCircle, 
   Loader2,
   Download,
-  RefreshCw,
-  Camera,
-  CameraOff
+  RefreshCw
 } from "lucide-react";
 
 export default function AssetAudit() {
@@ -65,12 +63,9 @@ export default function AssetAudit() {
     queryFn: () => backend.asset.listAudits({ limit: 10 }),
   });
 
-  const handleScan = (result: any, error: any) => {
-    if (!!result && isScanning) {
-      scanMutation.mutate({ qrCodeData: result.text, notes });
-    }
-    if (!!error) {
-      // console.info(error);
+  const handleScan = (data: string) => {
+    if (data && !scanMutation.isPending) {
+      scanMutation.mutate({ qrCodeData: data, notes });
     }
   };
 
@@ -92,59 +87,57 @@ export default function AssetAudit() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isScanning ? (
-              <div className="space-y-4">
-                <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center relative">
-                  <QrReader
-                    onResult={handleScan}
-                    constraints={{ facingMode: "environment" }}
-                    containerStyle={{ width: '100%', height: '100%' }}
-                  />
-                  <div className="absolute bottom-2 right-2">
-                    <Button variant="destructive" size="sm" onClick={() => setIsScanning(false)}>
-                      <CameraOff className="w-4 h-4 mr-2" />
-                      Stop Scanning
-                    </Button>
-                  </div>
-                </div>
+            <div className="space-y-4">
+              {scanResult && (
+                <>
+                  {scanResult.status === 'valid' && (
+                    <Alert variant="default"><CheckCircle className="h-4 w-4" /><AlertDescription>Asset Validated: {scanResult.message}</AlertDescription></Alert>
+                  )}
+                  {scanResult.status === 'invalid' && (
+                    <Alert variant="destructive"><XCircle className="h-4 w-4" /><AlertDescription>Asset Invalid: {scanResult.message}</AlertDescription></Alert>
+                  )}
+                  {scanResult.status === 'not_found' && (
+                    <Alert variant="destructive"><HelpCircle className="h-4 w-4" /><AlertDescription>Asset Not Found: {scanResult.message}</AlertDescription></Alert>
+                  )}
+                  {scanResult.asset && (
+                    <div className="space-y-2 border p-4 rounded-md bg-gray-50">
+                      <p className="text-sm"><strong>Asset ID:</strong> {scanResult.asset.assetId}</p>
+                      <p className="text-sm"><strong>Product:</strong> {scanResult.asset.productName}</p>
+                      <p className="text-sm"><strong>Serial:</strong> {scanResult.asset.serialNumber}</p>
+                      <p className="text-sm"><strong>Brand:</strong> {scanResult.asset.brandName}</p>
+                      <p className="text-sm"><strong>Location:</strong> {scanResult.asset.location || "N/A"}</p>
+                      <p className="text-sm"><strong>Assigned to:</strong> {scanResult.asset.assignedUser || "Unassigned"}</p>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              <QRScanner
+                onScan={handleScan}
+                isScanning={isScanning}
+                onStartScan={() => setIsScanning(true)}
+                onStopScan={() => setIsScanning(false)}
+              />
+              
+              {!isScanning && scanResult && (
+                <Button onClick={handleRescan} className="w-full">
+                  Scan Another Asset
+                </Button>
+              )}
+              
+              {isScanning && (
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add any notes about the audit..." />
+                  <Textarea 
+                    id="notes" 
+                    value={notes} 
+                    onChange={(e) => setNotes(e.target.value)} 
+                    placeholder="Add any notes about the audit..."
+                    rows={3}
+                  />
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {scanResult ? (
-                  <>
-                    {scanResult.status === 'valid' && (
-                      <Alert variant="default"><CheckCircle className="h-4 w-4" /><AlertDescription>Asset Validated: {scanResult.message}</AlertDescription></Alert>
-                    )}
-                    {scanResult.status === 'invalid' && (
-                      <Alert variant="destructive"><XCircle className="h-4 w-4" /><AlertDescription>Asset Invalid: {scanResult.message}</AlertDescription></Alert>
-                    )}
-                    {scanResult.status === 'not_found' && (
-                      <Alert variant="destructive"><HelpCircle className="h-4 w-4" /><AlertDescription>Asset Not Found: {scanResult.message}</AlertDescription></Alert>
-                    )}
-                    {scanResult.asset && (
-                      <div className="space-y-2 border p-4 rounded-md">
-                        <p><strong>Asset ID:</strong> {scanResult.asset.assetId}</p>
-                        <p><strong>Product:</strong> {scanResult.asset.productName}</p>
-                        <p><strong>Serial:</strong> {scanResult.asset.serialNumber}</p>
-                        <p><strong>Assigned to:</strong> {scanResult.asset.assignedUser || "Unassigned"}</p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">Click the button to start scanning.</p>
-                  </div>
-                )}
-                <Button onClick={handleRescan}>
-                  <Camera className="w-4 h-4 mr-2" />
-                  {scanResult ? "Scan Another Asset" : "Start Scanning"}
-                </Button>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
 

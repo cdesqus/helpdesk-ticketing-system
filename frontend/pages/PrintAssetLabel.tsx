@@ -2,6 +2,13 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useBackend } from "../hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 
 export default function PrintAssetLabel() {
@@ -11,10 +18,12 @@ export default function PrintAssetLabel() {
   const [labelHtml, setLabelHtml] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [labelSize, setLabelSize] = useState<"60x30" | "4x6" | "a4">("60x30");
 
   useEffect(() => {
     if (id) {
-      backend.asset.generateQRLabel({ id: parseInt(id) })
+      setIsLoading(true);
+      backend.asset.generateQRLabel({ id: parseInt(id), labelSize })
         .then(response => {
           setLabelHtml(response.labelHtml);
         })
@@ -26,7 +35,7 @@ export default function PrintAssetLabel() {
           setIsLoading(false);
         });
     }
-  }, [id, backend]);
+  }, [id, backend, labelSize]);
 
   if (isLoading) {
     return (
@@ -54,11 +63,24 @@ export default function PrintAssetLabel() {
 
   return (
     <div className="bg-gray-100 p-4">
-      <div className="mb-4 no-print">
+      <div className="mb-4 no-print flex gap-4 items-center">
         <Button onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Asset
         </Button>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Label Size:</label>
+          <Select value={labelSize} onValueChange={(value: "60x30" | "4x6" | "a4") => setLabelSize(value)}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="60x30">60mm x 30mm</SelectItem>
+              <SelectItem value="4x6">4" x 6"</SelectItem>
+              <SelectItem value="a4">A4</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div dangerouslySetInnerHTML={{ __html: labelHtml }} />
     </div>

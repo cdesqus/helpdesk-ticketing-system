@@ -302,9 +302,6 @@ export namespace asset {
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_list_listAssets>
         }
 
-        /**
-         * Lists asset audit records.
-         */
         public async listAudits(params: RequestType<typeof api_asset_audit_listAudits>): Promise<ResponseType<typeof api_asset_audit_listAudits>> {
             // Convert our params into the objects we need for the request
             const query = makeRecord<string, string | string[]>({
@@ -318,9 +315,6 @@ export namespace asset {
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_asset_audit_listAudits>
         }
 
-        /**
-         * Scans QR code and validates asset during audit.
-         */
         public async scanAsset(params: RequestType<typeof api_asset_audit_scanAsset>): Promise<ResponseType<typeof api_asset_audit_scanAsset>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/assets/scan`, {method: "POST", body: JSON.stringify(params)})

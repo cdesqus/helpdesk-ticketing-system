@@ -1,0 +1,175 @@
+import React, { useState, useEffect, useRef } from "react";
+import { BrowserMultiFormatReader, BarcodeFormat } from "@zxing/browser";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Camera, CameraOff, AlertCircle } from "lucide-react";
+
+interface CodeScannerProps {
+  onScan: (data: string, format: string) => void;
+  onError?: (error: string) => void;
+  isScanning: boolean;
+  onStartScan: () => void;
+  onStopScan: () => void;
+}
+
+export default function CodeScanner({ 
+  onScan, 
+  onError, 
+  isScanning, 
+  onStartScan, 
+  onStopScan
+}: CodeScannerProps) {
+  const [error, setError] = useState<string>("");
+  const [hasScanned, setHasScanned] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  useEffect(() => {
+    if (isScanning) {
+      startScanner();
+    } else {
+      stopScanner();
+    }
+
+    return () => {
+      stopScanner();
+    };
+  }, [isScanning]);
+
+  const startScanner = async () => {
+    try {
+      setHasScanned(false);
+      setError("");
+      
+      if (!readerRef.current) {
+        const hints = new Map();
+        hints.set(2, [
+          BarcodeFormat.QR_CODE,
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.CODE_39,
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+        ]);
+        readerRef.current = new BrowserMultiFormatReader(hints);
+      }
+
+      const videoInputDevices = await BrowserMultiFormatReader.listVideoInputDevices();
+      
+      if (videoInputDevices.length === 0) {
+        throw new Error("No camera devices found");
+      }
+
+      const rearCamera = videoInputDevices.find((device: MediaDeviceInfo) => 
+        device.label.toLowerCase().includes('back') || 
+        device.label.toLowerCase().includes('rear')
+      );
+      const deviceId = rearCamera?.deviceId || videoInputDevices[0].deviceId;
+
+      if (videoRef.current) {
+        readerRef.current.decodeFromVideoDevice(
+          deviceId,
+          videoRef.current,
+          (result, err) => {
+            if (result && !hasScanned) {
+              setHasScanned(true);
+              const formatName = BarcodeFormat[result.getBarcodeFormat()] || "UNKNOWN";
+              onScan(result.getText(), formatName);
+            }
+
+            if (err && err.name !== 'NotFoundException') {
+              const errorMessage = "Error scanning code. Please try again.";
+              setError(errorMessage);
+              if (onError) onError(errorMessage);
+            }
+          }
+        );
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to access camera. Please ensure camera permissions are granted.";
+      setError(errorMessage);
+      if (onError) onError(errorMessage);
+      onStopScan();
+    }
+  };
+
+  const stopScanner = () => {
+    if (readerRef.current && videoRef.current) {
+      try {
+        const stream = videoRef.current.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        videoRef.current.srcObject = null;
+      } catch (e) {
+      }
+    }
+  };
+
+  const handleStartScan = () => {
+    setHasScanned(false);
+    setError("");
+    onStartScan();
+  };
+
+  if (!isScanning) {
+    return (
+      <div className="text-center py-8">
+        <Camera className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+        <p className="text-gray-500 mb-4">Ready to scan QR codes and barcodes</p>
+        <Button onClick={handleStartScan} size="lg">
+          <Camera className="w-5 h-5 mr-2" />
+          Start Camera
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="relative w-full rounded-lg overflow-hidden bg-black">
+        <video
+          ref={videoRef}
+          className="w-full h-auto"
+          style={{ 
+            minHeight: '300px',
+            maxHeight: '500px',
+            objectFit: 'cover'
+          }}
+        />
+        
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="relative w-64 h-64 border-2 border-white/50 rounded-lg">
+            <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-blue-500"></div>
+            <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-blue-500"></div>
+            <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-blue-500"></div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-blue-500"></div>
+          </div>
+        </div>
+
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10 pointer-events-auto">
+          <Button variant="destructive" size="sm" onClick={onStopScan}>
+            <CameraOff className="w-4 h-4 mr-2" />
+            Stop Camera
+          </Button>
+        </div>
+      </div>
+
+      <div className="text-center text-sm text-gray-600">
+        <p>Position the QR code or barcode within the frame to scan</p>
+        <p className="text-xs text-gray-500 mt-1">
+          Supports: QR Code, Code 128, Code 39, EAN-13, EAN-8, UPC-A, UPC-E
+        </p>
+        <p className="text-xs text-gray-500">Make sure to allow camera access when prompted</p>
+      </div>
+    </div>
+  );
+}

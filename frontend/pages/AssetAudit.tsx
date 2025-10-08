@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBackend } from "../hooks/useAuth";
-import QRScanner from "../components/QRScanner";
+import CodeScanner from "../components/CodeScanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,9 +34,10 @@ export default function AssetAudit() {
   const [scanResult, setScanResult] = useState<any>(null);
   const [notes, setNotes] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+  const [scannedFormat, setScannedFormat] = useState<string>("");
 
   const scanMutation = useMutation({
-    mutationFn: (data: { qrCodeData: string; notes?: string }) => backend.asset.scanAsset(data),
+    mutationFn: (data: { codeData: string; codeFormat?: string; notes?: string }) => backend.asset.scanAsset(data),
     onSuccess: (result) => {
       setScanResult(result);
       setIsScanning(false);
@@ -63,15 +64,17 @@ export default function AssetAudit() {
     queryFn: () => backend.asset.listAudits({ limit: 10 }),
   });
 
-  const handleScan = (data: string) => {
+  const handleScan = (data: string, format: string) => {
     if (data && !scanMutation.isPending) {
-      scanMutation.mutate({ qrCodeData: data, notes });
+      setScannedFormat(format);
+      scanMutation.mutate({ codeData: data, codeFormat: format, notes });
     }
   };
 
   const handleRescan = () => {
     setScanResult(null);
     setNotes("");
+    setScannedFormat("");
     setIsScanning(true);
   };
 
@@ -83,7 +86,7 @@ export default function AssetAudit() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <ScanLine className="w-5 h-5 mr-2" />
-              Scan Asset QR Code
+              Scan Asset QR Code or Barcode
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -101,6 +104,9 @@ export default function AssetAudit() {
                   )}
                   {scanResult.asset && (
                     <div className="space-y-2 border p-4 rounded-md bg-gray-50">
+                      {scannedFormat && (
+                        <p className="text-sm"><strong>Scan Type:</strong> {scannedFormat}</p>
+                      )}
                       <p className="text-sm"><strong>Asset ID:</strong> {scanResult.asset.assetId}</p>
                       <p className="text-sm"><strong>Product:</strong> {scanResult.asset.productName}</p>
                       <p className="text-sm"><strong>Serial:</strong> {scanResult.asset.serialNumber}</p>
@@ -112,7 +118,7 @@ export default function AssetAudit() {
                 </>
               )}
               
-              <QRScanner
+              <CodeScanner
                 onScan={handleScan}
                 isScanning={isScanning}
                 onStartScan={() => setIsScanning(true)}

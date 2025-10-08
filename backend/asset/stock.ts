@@ -96,6 +96,10 @@ export const adjustStock = api(
         quantity_before, quantity_after, performed_by, reason, reference_number, created_at
     `;
 
+    if (!result) {
+      throw new Error("Failed to create stock transaction");
+    }
+
     const transaction: StockTransaction = {
       id: result.id,
       assetId: result.asset_id,
@@ -123,7 +127,7 @@ export const getStockTransactions = api(
     const auth = getAuthData();
     if (!auth) throw new Error("Unauthorized");
 
-    const rows = await assetDB.query`
+    const rows = await assetDB.queryAll`
       SELECT 
         id, asset_id, transaction_type, quantity_change, 
         quantity_before, quantity_after, performed_by, reason, reference_number, created_at
@@ -155,7 +159,7 @@ export const getLowStockItems = api(
     const auth = getAuthData();
     if (!auth) throw new Error("Unauthorized");
 
-    const rows = await assetDB.query`
+    const rows = await assetDB.queryAll`
       SELECT id, asset_id, product_name, brand_name, quantity, min_stock_level
       FROM assets
       WHERE is_consumable = TRUE 

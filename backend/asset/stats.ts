@@ -12,126 +12,142 @@ export const getAssetStats = api<void, GetAssetStatsResponse>(
   { auth: true, expose: true, method: "GET", path: "/assets/stats" },
   async () => {
     const auth = getAuthData()!;
+    console.log(`[AssetStats] Getting stats for user: ${auth.username} (role: ${auth.role})`);
     
-    let whereClause = "WHERE 1=1";
-    const params: any[] = [];
-    let paramIndex = 1;
+    try {
+      // Get total assets
+      const totalResult = await assetDB.queryRow<{ count: number }>`
+        SELECT COUNT(*) as count FROM assets
+      `;
+      const totalAssets = Number(totalResult?.count) || 0;
+      console.log(`[AssetStats] Total assets: ${totalAssets}`);
 
-    // Apply role-based filtering
-    if (auth.role === "reporter") {
-      // Reporters can only see stats for assets assigned to them
-      whereClause += ` AND (assigned_user_email = $${paramIndex} OR assigned_user = $${paramIndex})`;
-      params.push(auth.email);
-      paramIndex++;
-    }
-    // Admins and engineers can see all asset stats
+      // Get assets by category
+      const categoryRows = await assetDB.queryAll<{
+        category: AssetCategory;
+        count: number;
+      }>`
+        SELECT category, COUNT(*) as count 
+        FROM assets
+        GROUP BY category 
+        ORDER BY count DESC
+      `;
+      console.log(`[AssetStats] Categories found: ${categoryRows.length}`);
 
-    // Get total assets
-    const totalQuery = `SELECT COUNT(*) as count FROM assets ${whereClause}`;
-    const totalResult = await assetDB.rawQueryRow<{ count: number }>(totalQuery, ...params);
-    const totalAssets = totalResult?.count || 0;
+      // Get assets by status
+      const statusRows = await assetDB.queryAll<{
+        status: AssetStatus;
+        count: number;
+      }>`
+        SELECT status, COUNT(*) as count 
+        FROM assets
+        GROUP BY status 
+        ORDER BY count DESC
+      `;
+      console.log(`[AssetStats] Statuses found: ${statusRows.length}`);
 
-    // Get assets by category
-    const categoryQuery = `
-      SELECT category, COUNT(*) as count 
-      FROM assets ${whereClause}
-      GROUP BY category 
-      ORDER BY count DESC
-    `;
-    const categoryRows = await assetDB.rawQueryAll<{
-      category: AssetCategory;
-      count: number;
-    }>(categoryQuery, ...params);
+      // Get assets by user
+      const userRows = await assetDB.queryAll<{
+        user: string;
+        count: number;
+      }>`
+        SELECT 
+          COALESCE(assigned_user, 'Unassigned') as user, 
+          COUNT(*) as count 
+        FROM assets
+        GROUP BY assigned_user 
+        ORDER BY count DESC
+        LIMIT 10
+      `;
+      console.log(`[AssetStats] User assignments found: ${userRows.length}`);
 
-    // Get assets by status
-    const statusQuery = `
-      SELECT status, COUNT(*) as count 
-      FROM assets ${whereClause}
-      GROUP BY status 
-      ORDER BY count DESC
-    `;
-    const statusRows = await assetDB.rawQueryAll<{
-      status: AssetStatus;
-      count: number;
-    }>(statusQuery, ...params);
+      // Get warranty expiring soon (within 30 days)
+      const warrantyResult = await assetDB.queryRow<{ count: number }>`
+        SELECT COUNT(*) as count 
+        FROM assets
+        WHERE warranty_expiry_date IS NOT NULL 
+        AND warranty_expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+        AND warranty_expiry_date >= CURRENT_DATE
+      `;
+      const warrantyExpiringSoon = Number(warrantyResult?.count) || 0;
+      console.log(`[AssetStats] Warranties expiring soon: ${warrantyExpiringSoon}`);
 
-    // Get assets by user
-    const userQuery = `
-      SELECT 
-        COALESCE(assigned_user, 'Unassigned') as user, 
-        COUNT(*) as count 
-      FROM assets ${whereClause}
-      GROUP BY assigned_user 
-      ORDER BY count DESC
-      LIMIT 10
-    `;
-    const userRows = await assetDB.rawQueryAll<{
-      user: string;
-      count: number;
-    }>(userQuery, ...params);
+      // Get audit progress
+      let auditedAssets = 0;
+      let validAssets = 0;
+      let invalidAssets = 0;
 
-    // Get warranty expiring soon (within 30 days)
-    const warrantyQuery = `
-      SELECT COUNT(*) as count 
-      FROM assets ${whereClause}
-      AND warranty_expiry_date IS NOT NULL 
-      AND warranty_expiry_date <= CURRENT_DATE + INTERVAL '30 days'
-      AND warranty_expiry_date >= CURRENT_DATE
-    `;
-    const warrantyResult = await assetDB.rawQueryRow<{ count: number }>(warrantyQuery, ...params);
-    const warrantyExpiringSoon = warrantyResult?.count || 0;
+      try {
+        const auditedAssetsResult = await assetDB.queryRow<{ count: number }>`
+          SELECT COUNT(DISTINCT asset_id) as count 
+          FROM asset_audits
+        `;
+        auditedAssets = Number(auditedAssetsResult?.count) || 0;
 
-    // Get audit progress
-    const auditedAssetsQuery = `
-      SELECT COUNT(DISTINCT asset_id) as count 
-      FROM asset_audits aa
-      JOIN assets a ON aa.asset_id = a.id
-      ${whereClause.replace('WHERE 1=1', 'WHERE 1=1')}
-    `;
-    const auditedAssetsResult = await assetDB.rawQueryRow<{ count: number }>(auditedAssetsQuery, ...params);
-    const auditedAssets = auditedAssetsResult?.count || 0;
+        const validAssetsResult = await assetDB.queryRow<{ count: number }>`
+          SELECT COUNT(DISTINCT asset_id) as count 
+          FROM asset_audits
+          WHERE status = 'valid'
+        `;
+        validAssets = Number(validAssetsResult?.count) || 0;
 
-    const validAssetsQuery = `
-      SELECT COUNT(DISTINCT asset_id) as count 
-      FROM asset_audits aa
-      JOIN assets a ON aa.asset_id = a.id
-      ${whereClause.replace('WHERE 1=1', 'WHERE aa.status = \'valid\' AND 1=1')}
-    `;
-    const validAssetsResult = await assetDB.rawQueryRow<{ count: number }>(validAssetsQuery, ...params);
-    const validAssets = validAssetsResult?.count || 0;
+        const invalidAssetsResult = await assetDB.queryRow<{ count: number }>`
+          SELECT COUNT(DISTINCT asset_id) as count 
+          FROM asset_audits
+          WHERE status = 'invalid'
+        `;
+        invalidAssets = Number(invalidAssetsResult?.count) || 0;
+        
+        console.log(`[AssetStats] Audit progress - audited: ${auditedAssets}, valid: ${validAssets}, invalid: ${invalidAssets}`);
+      } catch (auditError) {
+        console.error("[AssetStats] Error querying audit data:", auditError);
+        // Keep defaults as 0
+      }
 
-    const invalidAssetsQuery = `
-      SELECT COUNT(DISTINCT asset_id) as count 
-      FROM asset_audits aa
-      JOIN assets a ON aa.asset_id = a.id
-      ${whereClause.replace('WHERE 1=1', 'WHERE aa.status = \'invalid\' AND 1=1')}
-    `;
-    const invalidAssetsResult = await assetDB.rawQueryRow<{ count: number }>(invalidAssetsQuery, ...params);
-    const invalidAssets = invalidAssetsResult?.count || 0;
-
-    const stats: AssetStats = {
-      totalAssets,
-      assetsByCategory: categoryRows.map(row => ({
-        category: row.category,
-        count: row.count,
-      })),
-      assetsByStatus: statusRows.map(row => ({
-        status: row.status,
-        count: row.count,
-      })),
-      assetsByUser: userRows.map(row => ({
-        user: row.user,
-        count: row.count,
-      })),
-      warrantyExpiringSoon,
-      auditProgress: {
+      const stats: AssetStats = {
         totalAssets,
-        auditedAssets,
-        validAssets,
-        invalidAssets,
-      },
-    };
+        assetsByCategory: categoryRows.map(row => ({
+          category: row.category,
+          count: Number(row.count),
+        })),
+        assetsByStatus: statusRows.map(row => ({
+          status: row.status,
+          count: Number(row.count),
+        })),
+        assetsByUser: userRows.map(row => ({
+          user: row.user,
+          count: Number(row.count),
+        })),
+        warrantyExpiringSoon,
+        auditProgress: {
+          totalAssets,
+          auditedAssets,
+          validAssets,
+          invalidAssets,
+        },
+      };
 
-    return { stats };
+      console.log(`[AssetStats] Successfully calculated all stats`);
+      return { stats };
+    } catch (error) {
+      console.error("[AssetStats] Error in getAssetStats:", error);
+      
+      // Return empty stats on error
+      return {
+        stats: {
+          totalAssets: 0,
+          assetsByCategory: [],
+          assetsByStatus: [],
+          assetsByUser: [],
+          warrantyExpiringSoon: 0,
+          auditProgress: {
+            totalAssets: 0,
+            auditedAssets: 0,
+            validAssets: 0,
+            invalidAssets: 0,
+          },
+        },
+      };
+    }
   }
 );

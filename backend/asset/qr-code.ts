@@ -13,11 +13,8 @@ export interface GenerateQRCodeResponse {
 }
 
 export interface GenerateQRLabelRequest {
-  labelSize?: "60x30" | "4x6" | "a4";
-}
-
-export interface GenerateQRLabelParams {
   id: number;
+  labelSize?: "60x30" | "4x6" | "a4";
 }
 
 export interface GenerateQRLabelResponse {
@@ -88,10 +85,10 @@ export const generateQRCode = api<GenerateQRCodeRequest, GenerateQRCodeResponse>
   }
 );
 
-// Generates printable QR code label for an asset.
-export const generateQRLabel = api(
+// Generates printable QR code label for an asset
+export const generateQRLabel = api<GenerateQRLabelRequest, GenerateQRLabelResponse>(
   { auth: true, expose: true, method: "POST", path: "/assets/:id/qr-label" },
-  async (req: GenerateQRLabelRequest & GenerateQRLabelParams): Promise<GenerateQRLabelResponse> => {
+  async (req) => {
     const auth = getAuthData()!;
     
     // Only admins and engineers can generate QR labels

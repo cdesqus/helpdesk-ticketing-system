@@ -402,6 +402,12 @@ export default function AssetDetail() {
         <div className="flex items-center space-x-2">
           {!isEditing ? (
             <>
+              {asset.isConsumable && (
+                <Button variant="default" onClick={() => navigate(`/assets/${id}/stock`)}>
+                  <Package className="w-4 h-4 mr-2" />
+                  Manage Stock
+                </Button>
+              )}
               {canEdit && (
                 <Button onClick={handleEdit}>
                   <Edit className="w-4 h-4 mr-2" />
